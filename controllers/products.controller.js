@@ -1,5 +1,6 @@
 import ProductsModel from "../modals/Product.modal.js";
 import { readExcelToJSON } from "../utils/excel.js";
+import XLSX from 'xlsx';
 
 const HEADER_MAP = {
   "CODE": "CODE",
@@ -77,6 +78,7 @@ export const importProducts = async (req, res) => {
             },
             $setOnInsert: {
               CODE: mapped.CODE,
+              adminId: req.user.id,
               createdAt: new Date(),
             },
           },
@@ -207,3 +209,60 @@ export const deleteProductById = async (req, res) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
+export const exportProducts = async (req, res) => {
+  try {
+    // استخدام نفس منطق الفلترة من getProducts
+    const filters = {};
+    if (req.query.brand) filters.BRAND = req.query.brand;
+    if (req.query.company) filters.COMPANY = req.query.company;
+    if (req.query.type) filters.PRODUCT_TYPE = req.query.type;
+
+    // الحصول على جميع المنتجات المفلترة (بدون pagination)
+    const products = await ProductsModel.find(filters)
+      .select('CODE PRODUCT PRODUCT_TYPE PRICE BRAND COMPANY teamProducts')
+      .lean();
+
+    if (products.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'لا توجد منتجات تطابق الفلترة المحددة' 
+      });
+    }
+
+    // تحضير البيانات للـ Excel
+    const excelData = products.map(product => ({
+      'CODE': product.CODE || '',
+      'PRODUCT': product.PRODUCT || '',
+      'PRODUCT_TYPE': product.PRODUCT_TYPE || '',
+      'PRICE': product.PRICE || 0,
+      'BRAND': product.BRAND || '',
+      'COMPANY': product.COMPANY || '',
+      'TEAM_PRODUCTS': product.teamProducts || ''
+    }));
+
+    // إنشاء workbook و worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    // إضافة worksheet للـ workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+    
+    // تحويل لـ buffer
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // إعداد headers للتحميل
+    const filename = `products_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    
+    // إرسال الملف
+    res.send(buffer);
+    
+  } catch (err) {
+     console.error('Export error:', err);
+     res.status(500).json({ success: false, message: err.message });
+   }
+ };

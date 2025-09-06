@@ -31,6 +31,8 @@ const ProductsSchema = new mongoose.Schema(
         message: "كل منتج لا يمكن أن يحتوي على أكثر من 3 رسائل",
       },
     },
+      adminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
+
   },
   { timestamps: true }
 );

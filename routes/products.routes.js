@@ -1,12 +1,14 @@
 import { Router } from "express";
 import multer from "multer";
-import { addProduct, deleteProductById, getProducts, importProducts, updateProductByCode } from "../controllers/products.controller.js";
+import { addProduct, deleteProductById, getProducts, importProducts, updateProductByCode, exportProducts } from "../controllers/products.controller.js";
 import { importProductMessages } from "../controllers/productsMessages.controller.js";
+import { isAuthenticated } from "../middleware/auth.js";
+import { checkRole } from "../middleware/chekRole.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post("/import", upload.single("file"), importProducts);
+router.post("/import", isAuthenticated, checkRole(["ADMIN"]), upload.single("file"), importProducts);
 router.post("/", addProduct);
 router.put("/code/:code", updateProductByCode);
 router.delete("/:id", deleteProductById);
@@ -14,7 +16,8 @@ router.delete("/:id", deleteProductById);
 
 
 router.get("/", getProducts);
-router.post("/messages/import", upload.single("file"), importProductMessages);
+router.get("/export", exportProducts);
+router.post("/messages/import", isAuthenticated, checkRole(["ADMIN"]), upload.single("file"), importProductMessages);
 
 
 
