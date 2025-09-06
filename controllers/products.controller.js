@@ -6,6 +6,7 @@ const HEADER_MAP = {
   "PRODUCT": "PRODUCT",
   "PRODUCT TYPE": "PRODUCT_TYPE",
   "PRODUCT_TYPE": "PRODUCT_TYPE",
+  "PRICE": "PRICE",
   "BRAND": "BRAND",
   "TEAM": "TEAM",
   "COMPANY": "COMPANY",
@@ -13,12 +14,18 @@ const HEADER_MAP = {
 
 const norm = (v) => (typeof v === "string" ? v.trim() : v);
 
+/**
+ * @route  POST /api/products/import
+ * @desc   Import products from Excel (multer: .single('file'))
+ */
 export const importProducts = async (req, res) => {
   try {
+    // تأكيد وجود الملف
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
+    // قراءة كل الصفوف من الإكسيل
     const rows = readExcelToJSON(req.file.buffer);
 
     const products = [];
@@ -26,40 +33,56 @@ export const importProducts = async (req, res) => {
 
     for (const row of rows) {
       const mapped = {};
+
+      // تطبيع أسماء الأعمدة وربطها بالحقول
       for (const [key, value] of Object.entries(row)) {
         const targetKey = HEADER_MAP[String(key).trim().toUpperCase()];
         if (!targetKey) continue;
 
         if (targetKey === "TEAM") {
-          mapped.TEAM = String(value ?? "").trim();        // ✅ كنص
+          mapped.TEAM = String(value ?? "").trim();                 // TEAM نص
         } else if (targetKey === "PRODUCT_TYPE") {
-          mapped.PRODUCT_TYPE = String(value ?? "").trim().toUpperCase();
+          mapped.PRODUCT_TYPE = String(value ?? "").trim().toUpperCase(); // توحيد الصيغة
+        } else if (targetKey === "PRICE") {
+          // تحويل السعر لرقم والتحقق
+          const num = Number(value);
+          mapped.PRICE = num;
         } else {
           mapped[targetKey] = norm(value);
         }
       }
 
-      // تحقق من الحقول الأساسية
+      // ✅ تحقق من الحقول الأساسية المطلوبة
+      // لو الـ Schema عندك PRICE required يبقى لازم نتحقق منه هنا
       if (!mapped.CODE || !mapped.PRODUCT) {
         skipped.push({ reason: "missing CODE/PRODUCT", row });
+        continue;
+      }
+
+      // تحقق من السعر: لازم يكون رقم صالح
+      if (mapped.PRICE === undefined || Number.isNaN(mapped.PRICE)) {
+        skipped.push({ reason: "invalid PRICE", row });
         continue;
       }
 
       products.push(mapped);
     }
 
-    // إدخال (وممكن تعمل upsert على CODE لو عايز تمنع التكرار)
-    const result = await ProductsModel.insertMany(products, { ordered: false });
+    // إدخال المنتجات الصالحة فقط
+    // ملاحظة: لو عايز تمنع التكرار على CODE استخدم unique index أو bulk upsert
+    const result = products.length
+      ? await ProductsModel.insertMany(products, { ordered: false })
+      : [];
 
-    res.json({
+    return res.json({
       success: true,
       inserted: result.length,
       skipped: skipped.length,
-      skippedSamples: skipped.slice(0, 5),
+      skippedSamples: skipped.slice(0, 5), // أمثلة أول 5 صفوف متخطّية
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("[importProducts] error:", err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -153,10 +176,9 @@ export const updateProductByCode = async (req, res) => {
   }
 };
 
-export const deleteProductByCode = async (req, res) => {
+export const deleteProductById = async (req, res) => {
   try {
-    const doc = await ProductsModel.findOneAndDelete({ CODE: req.params.code });
-    if (!doc) return res.status(404).json({ success: false, message: "Product not found" });
+    await ProductsModel.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Product deleted" });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
