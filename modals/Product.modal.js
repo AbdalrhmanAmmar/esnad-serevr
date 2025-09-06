@@ -16,7 +16,7 @@ const ProductsSchema = new mongoose.Schema(
     PRODUCT:      { type: String, required: true, trim: true },
     PRODUCT_TYPE: { type: String, trim: true },
     BRAND:        { type: String, trim: true },
-    TEAM:         { type: String, trim: true },
+    teamProducts: { type: String, trim: true },
     COMPANY:      { type: String, trim: true },
     PRICE:        { type: Number, required: true, default: 0 },
 

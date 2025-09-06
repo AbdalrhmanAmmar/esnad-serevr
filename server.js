@@ -2,6 +2,11 @@ import "dotenv/config";
 import express from "express";
 import { connection } from "./db/db.js"; 
 import productsRoutes from "./routes/products.routes.js";
+import doctorRoutes from "./routes/doctor.routes.js";
+import usersRoutes from "./routes/users.routes.js";
+import teamProductsRoutes from "./routes/Teamproducts.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import superAdminRoutes from "./routes/superAdmin.routes.js";
 import cors from "cors";
 
 
@@ -29,6 +34,11 @@ app.use(express.json());
 
 // ربط راوتر المنتجات
 app.use("/api/products", productsRoutes);
+app.use("/api/doctors", doctorRoutes);
+app.use("/api/users", usersRoutes);
+app.use("/api/teamproducts", teamProductsRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/setup", superAdminRoutes);
 
 const PORT = process.env.PORT || 4000;
 

@@ -8,7 +8,7 @@ const HEADER_MAP = {
   "PRODUCT_TYPE": "PRODUCT_TYPE",
   "PRICE": "PRICE",
   "BRAND": "BRAND",
-  "TEAM": "TEAM",
+  "TEAM PRODUCTS": "teamProducts",
   "COMPANY": "COMPANY",
 };
 
@@ -20,65 +20,88 @@ const norm = (v) => (typeof v === "string" ? v.trim() : v);
  */
 export const importProducts = async (req, res) => {
   try {
-    // تأكيد وجود الملف
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    // قراءة كل الصفوف من الإكسيل
     const rows = readExcelToJSON(req.file.buffer);
 
-    const products = [];
     const skipped = [];
+    const ops = [];
 
     for (const row of rows) {
       const mapped = {};
 
-      // تطبيع أسماء الأعمدة وربطها بالحقول
+      // خرّط الأعمدة حسب HEADER_MAP
       for (const [key, value] of Object.entries(row)) {
         const targetKey = HEADER_MAP[String(key).trim().toUpperCase()];
         if (!targetKey) continue;
 
-        if (targetKey === "TEAM") {
-          mapped.TEAM = String(value ?? "").trim();                 // TEAM نص
-        } else if (targetKey === "PRODUCT_TYPE") {
-          mapped.PRODUCT_TYPE = String(value ?? "").trim().toUpperCase(); // توحيد الصيغة
+        if (targetKey === "PRODUCT_TYPE") {
+          mapped.PRODUCT_TYPE = String(value ?? "").trim().toUpperCase();
         } else if (targetKey === "PRICE") {
-          // تحويل السعر لرقم والتحقق
           const num = Number(value);
-          mapped.PRICE = num;
+          mapped.PRICE = Number.isFinite(num) ? num : null;
+        } else if (targetKey === "teamProducts") {
+          mapped.teamProducts = value ? String(value).trim().toUpperCase() : "";
         } else {
           mapped[targetKey] = norm(value);
         }
       }
 
-      // ✅ تحقق من الحقول الأساسية المطلوبة
-      // لو الـ Schema عندك PRICE required يبقى لازم نتحقق منه هنا
+      // ✅ تحقق من الحقول الأساسية
       if (!mapped.CODE || !mapped.PRODUCT) {
         skipped.push({ reason: "missing CODE/PRODUCT", row });
         continue;
       }
 
-      // تحقق من السعر: لازم يكون رقم صالح
-      if (mapped.PRICE === undefined || Number.isNaN(mapped.PRICE)) {
+      // تحقق من السعر
+      if (mapped.PRICE === null) {
         skipped.push({ reason: "invalid PRICE", row });
         continue;
       }
 
-      products.push(mapped);
+      // Bulk upsert بالـ CODE
+      ops.push({
+        updateOne: {
+          filter: { CODE: mapped.CODE },
+          update: {
+            $set: {
+              PRODUCT: mapped.PRODUCT,
+              PRODUCT_TYPE: mapped.PRODUCT_TYPE,
+              PRICE: mapped.PRICE,
+              BRAND: mapped.BRAND,
+              COMPANY: mapped.COMPANY,
+              teamProducts: mapped.teamProducts,
+              updatedAt: new Date(),
+            },
+            $setOnInsert: {
+              CODE: mapped.CODE,
+              createdAt: new Date(),
+            },
+          },
+          upsert: true,
+        },
+      });
     }
 
-    // إدخال المنتجات الصالحة فقط
-    // ملاحظة: لو عايز تمنع التكرار على CODE استخدم unique index أو bulk upsert
-    const result = products.length
-      ? await ProductsModel.insertMany(products, { ordered: false })
-      : [];
+    let result = { upsertedCount: 0, modifiedCount: 0 };
+    if (ops.length) {
+      const bulk = await ProductsModel.bulkWrite(ops, { ordered: false });
+      result = {
+        upsertedCount: bulk.upsertedCount || 0,
+        modifiedCount: bulk.modifiedCount || 0,
+      };
+    }
 
     return res.json({
       success: true,
-      inserted: result.length,
+      insertedOrUpserted: result.upsertedCount,
+      updated: result.modifiedCount,
       skipped: skipped.length,
-      skippedSamples: skipped.slice(0, 5), // أمثلة أول 5 صفوف متخطّية
+      skippedSamples: skipped.slice(0, 5),
+      totalRows: rows.length,
+      processed: ops.length,
     });
   } catch (err) {
     console.error("[importProducts] error:", err);

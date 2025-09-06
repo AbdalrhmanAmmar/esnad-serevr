@@ -1,0 +1,41 @@
+### Test Authentication Endpoints
+### Use this file with REST Client extension in VS Code
+
+@baseUrl = http://localhost:4000/api
+@token = your-jwt-token-here
+
+### 1. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "test.user",
+  "password": "Esnad123456789"
+}
+
+### 2. Get Profile (requires token)
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{token}}
+
+### 3. Change Password (requires token)
+POST {{baseUrl}}/auth/change-password
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "currentPassword": "Esnad123456789",
+  "newPassword": "NewPassword123"
+}
+
+### 4. Refresh Token (requires token)
+POST {{baseUrl}}/auth/refresh-token
+Authorization: Bearer {{token}}
+
+### 5. Test Protected Route - Get Users (requires token)
+GET {{baseUrl}}/users
+Authorization: Bearer {{token}}
+
+### 6. Test Role-based Access (example)
+# This would require implementing role protection on specific routes
+GET {{baseUrl}}/admin/users
+Authorization: Bearer {{token}}
