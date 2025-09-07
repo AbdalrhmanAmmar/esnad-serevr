@@ -78,7 +78,7 @@ export const importProducts = async (req, res) => {
             },
             $setOnInsert: {
               CODE: mapped.CODE,
-              adminId: req.user.id,
+              adminId: req.user._id,
               createdAt: new Date(),
             },
           },
@@ -127,6 +127,9 @@ export const getProducts = async (req, res) => {
     if (req.query.brand) filters.BRAND = req.query.brand;
     if (req.query.company) filters.COMPANY = req.query.company;
     if (req.query.type) filters.PRODUCT_TYPE = req.query.type;
+    
+    // فلترة المنتجات حسب الـ admin المسجل دخوله
+    filters.adminId = req.user._id;
 
     // 2) Query DB
     const [items, total] = await Promise.all([
@@ -158,7 +161,7 @@ export const getProducts = async (req, res) => {
 
 export const addProduct = async (req, res) => {
   try {
-    const { CODE, PRODUCT, PRODUCT_TYPE, BRAND, TEAM, COMPANY } = req.body;
+    const { CODE, PRODUCT, PRODUCT_TYPE, BRAND, teamProducts, COMPANY, messages } = req.body;
 
     if (!CODE || !PRODUCT) {
       return res.status(400).json({ success: false, message: "CODE و PRODUCT مطلوبان" });
@@ -175,8 +178,10 @@ export const addProduct = async (req, res) => {
       PRODUCT,
       PRODUCT_TYPE,
       BRAND,
-      TEAM,
+      teamProducts,
       COMPANY,
+      adminId: req.user._id,
+      messages: messages || []
     });
 
     res.status(201).json({ success: true, data: doc });
@@ -217,6 +222,9 @@ export const exportProducts = async (req, res) => {
     if (req.query.brand) filters.BRAND = req.query.brand;
     if (req.query.company) filters.COMPANY = req.query.company;
     if (req.query.type) filters.PRODUCT_TYPE = req.query.type;
+    
+    // فلترة المنتجات حسب الـ admin المسجل دخوله
+    filters.adminId = req.user._id;
 
     // الحصول على جميع المنتجات المفلترة (بدون pagination)
     const products = await ProductsModel.find(filters)

@@ -9,14 +9,14 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/import", isAuthenticated, checkRole(["ADMIN"]), upload.single("file"), importProducts);
-router.post("/", addProduct);
+router.post("/", isAuthenticated, addProduct);
 router.put("/code/:code", updateProductByCode);
 router.delete("/:id", deleteProductById);
 
 
 
-router.get("/", getProducts);
-router.get("/export", exportProducts);
+router.get("/", isAuthenticated, getProducts);
+router.get("/export", isAuthenticated, exportProducts);
 router.post("/messages/import", isAuthenticated, checkRole(["ADMIN"]), upload.single("file"), importProductMessages);
 
 
