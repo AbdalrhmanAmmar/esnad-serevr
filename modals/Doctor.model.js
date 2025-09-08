@@ -17,15 +17,16 @@ const DoctorSchema = new mongoose.Schema(
     keyOpinionLeader:    { type: Boolean, default: false },
     teamProducts: { type: String, trim: true }, 
     teamArea: { type: String, trim: true },                             // TEAM AREA
+    adminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // ADMIN ID
                     // KEY OPENION LEADER
   },
   { timestamps: true }
 );
 
-// اندكس لتفادي التكرار المنطقي: نفس الدكتور + نفس الجهة + نفس المدينة
+// اندكس لتفادي التكرار المنطقي: نفس الدكتور + نفس الجهة + نفس المدينة + نفس الأدمن
 DoctorSchema.index(
-  { drName: 1, organizationName: 1, city: 1 },
-  { unique: true, name: "uniq_dr_org_city" }
+  { drName: 1, organizationName: 1, city: 1, adminId: 1 },
+  { unique: true, name: "uniq_dr_org_city_admin" }
 );
 
 // اختياري: رقم التليفون يكون فريد لو متوفر

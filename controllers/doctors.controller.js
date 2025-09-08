@@ -1,5 +1,5 @@
 import DoctorModel from "../modals/Doctor.model.js";
-import { readExcelToJSON } from "../utils/excel.js";
+import { readExcelToJSON, writeJSONToExcel } from "../utils/excel.js";
 
 
 
@@ -75,6 +75,7 @@ export const importDoctors = async (req, res) => {
                             ? String(mapped.teamProducts).trim().toUpperCase()
                             : "",
         teamArea:         mapped.teamArea ? String(mapped.teamArea).trim().toUpperCase() : "", // ✅ String واحد بس
+        adminId:          req.user._id, // إضافة adminId من المستخدم المسجل
       };
 
       // تحقق من الحقول الأساسية لتكوين مفتاح فريد منطقي
@@ -95,6 +96,7 @@ export const importDoctors = async (req, res) => {
             drName: doc.drName,
             organizationName: doc.organizationName,
             city: doc.city,
+            adminId: doc.adminId, // إضافة adminId للفلتر
           },
           update: {
             $set: {
@@ -115,6 +117,7 @@ export const importDoctors = async (req, res) => {
               drName: doc.drName,
               organizationName: doc.organizationName,
               city: doc.city,
+              adminId: req.user._id, // إضافة adminId عند الإنشاء
               createdAt: new Date(),
             },
           },
@@ -154,7 +157,8 @@ export const importDoctors = async (req, res) => {
 // POST /api/doctors  (JSON)
 export const createDoctor = async (req, res) => {
   try {
-    const doc = await DoctorModel.create(req.body);
+    const doctorData = { ...req.body, adminId: req.user._id };
+    const doc = await DoctorModel.create(doctorData);
     res.json({ success: true, data: doc });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -168,7 +172,7 @@ export const getDoctors = async (req, res) => {
     const limit = Math.max(parseInt(req.query.limit) || 10, 1);
     const skip  = (page - 1) * limit;
 
-    const q = {};
+    const q = { adminId: req.user._id }; // فلترة حسب adminId
     if (req.query.city) q.city = req.query.city;
     if (req.query.specialty) q.specialty = req.query.specialty;
     if (req.query.brand) q.brand = req.query.brand;
@@ -205,7 +209,11 @@ export const getDoctors = async (req, res) => {
 // PUT /api/doctors/:id
 export const updateDoctor = async (req, res) => {
   try {
-    const doc = await DoctorModel.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const doc = await DoctorModel.findOneAndUpdate(
+      { _id: req.params.id, adminId: req.user._id },
+      req.body,
+      { new: true }
+    );
     if (!doc) return res.status(404).json({ success: false, message: "Doctor not found" });
     res.json({ success: true, data: doc });
   } catch (err) {
@@ -216,10 +224,81 @@ export const updateDoctor = async (req, res) => {
 // DELETE /api/doctors/:id
 export const deleteDoctor = async (req, res) => {
   try {
-    const doc = await DoctorModel.findByIdAndDelete(req.params.id);
+    const doc = await DoctorModel.findOneAndDelete({ _id: req.params.id, adminId: req.user._id });
     if (!doc) return res.status(404).json({ success: false, message: "Doctor not found" });
     res.json({ success: true, message: "Doctor deleted" });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
+// GET /api/doctors/export - تصدير الدكاترة إلى Excel
+export const exportDoctors = async (req, res) => {
+  try {
+    // بناء الفلتر بنفس طريقة getDoctors
+    const q = { adminId: req.user._id }; // فلترة حسب adminId
+    if (req.query.city) q.city = req.query.city;
+    if (req.query.specialty) q.specialty = req.query.specialty;
+    if (req.query.brand) q.brand = req.query.brand;
+    if (req.query.search) {
+      const s = String(req.query.search).trim();
+      q.$or = [
+        { drName: new RegExp(s, "i") },
+        { organizationName: new RegExp(s, "i") },
+        { city: new RegExp(s, "i") },
+        { specialty: new RegExp(s, "i") },
+      ];
+    }
+
+    // جلب الدكاترة المفلترة للأدمن الحالي
+    const doctors = await DoctorModel.find(q)
+      .select('-__v -createdAt -updatedAt -adminId')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (doctors.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "لا توجد بيانات دكاترة للتصدير" 
+      });
+    }
+
+    // تحويل البيانات إلى تنسيق مناسب للتصدير
+    const exportData = doctors.map(doctor => ({
+      "DR NAME": doctor.drName || "",
+      "ORGANIZATION TYPE": doctor.organizationType || "",
+      "ORGANIZATION NAME": doctor.organizationName || "",
+      "SPECIALTY": doctor.specialty || "",
+      "TEL NUMBER": doctor.telNumber || "",
+      "PROFILE": doctor.profile || "",
+      "DISTRICT": doctor.district || "",
+      "CITY": doctor.city || "",
+      "AREA": doctor.area || "",
+      "BRAND": doctor.brand || "",
+      "SEGMENT": doctor.segment || "",
+      "TARGET FREQUENCY": doctor.targetFrequency || 0,
+      "KEY OPENION LEADER": doctor.keyOpinionLeader ? "Yes" : "No",
+      "TEAM PRODUCTS": doctor.teamProducts || "",
+      "TEAM AREA": doctor.teamArea || ""
+    }));
+
+    // إنشاء ملف Excel
+    const excelBuffer = writeJSONToExcel(exportData, "Doctors");
+
+    // تحديد اسم الملف مع التاريخ
+    const currentDate = new Date().toISOString().split('T')[0];
+    const filename = `doctors_export_${currentDate}.xlsx`;
+
+    // إرسال الملف
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    
+    res.send(excelBuffer);
+  } catch (err) {
+    res.status(500).json({ 
+       success: false, 
+       message: "خطأ في تصدير البيانات: " + err.message 
+     });
+   }
+ };

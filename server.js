@@ -7,6 +7,8 @@ import usersRoutes from "./routes/users.routes.js";
 import teamProductsRoutes from "./routes/Teamproducts.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import superAdminRoutes from "./routes/superAdmin.routes.js";
+import marketingActivitiesRoutes from "./routes/marketingActivities.routes.js";
+import supervisorRoutes from "./routes/supervisor.routes.js";
 import cors from "cors";
 
 
@@ -39,6 +41,8 @@ app.use("/api/users", usersRoutes);
 app.use("/api/teamproducts", teamProductsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/setup", superAdminRoutes);
+app.use("/api/marketing-activities", marketingActivitiesRoutes);
+app.use("/api/supervisor", supervisorRoutes);
 
 const PORT = process.env.PORT || 4000;
 
