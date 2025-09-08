@@ -9,6 +9,8 @@ import authRoutes from "./routes/auth.routes.js";
 import superAdminRoutes from "./routes/superAdmin.routes.js";
 import marketingActivitiesRoutes from "./routes/marketingActivities.routes.js";
 import supervisorRoutes from "./routes/supervisor.routes.js";
+import medicalrepRoutes from "./routes/medicalrep.routes.js";
+import formvisitdoctormedicalrepRoutes from "./routes/formvisitdoctormedicalrep.routes.js";
 import cors from "cors";
 
 
@@ -43,6 +45,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/setup", superAdminRoutes);
 app.use("/api/marketing-activities", marketingActivitiesRoutes);
 app.use("/api/supervisor", supervisorRoutes);
+app.use("/api/medicalrep", medicalrepRoutes);
+app.use("/api/visit-forms", formvisitdoctormedicalrepRoutes);
 
 const PORT = process.env.PORT || 4000;
 
