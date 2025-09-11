@@ -1,5 +1,5 @@
 import UserModel from '../modals/User.model.js';
-import Product from '../modals/Product.modal.js';
+import ProductsModel from '../modals/Product.modal.js';
 import Doctor from '../modals/Doctor.model.js';
 
 // Helpers
@@ -20,7 +20,7 @@ const getMedicalRepData = async (req, res) => {
 
     // احضر بيانات اليوزر
     const user = await UserModel.findById(userId)
-      .select('firstName lastName username teamProducts teamArea adminId role')
+      .select('firstName lastName username teamProducts area adminId role')
       .lean();
 
     if (!user) {
@@ -34,18 +34,18 @@ const getMedicalRepData = async (req, res) => {
 
     // حوّل القيم إلى قوائم
     const userTeamProductsList = toList(user.teamProducts);
-    const userTeamAreaList = toList(user.teamArea);
+    const userAreaList = toList(user.area);
 
     // TEAM C أو ALL = يشوف كل المنتجات
     const isAllProducts =
       userTeamProductsList.length === 0 ||
       userTeamProductsList.some((x) => toUpper(x) === 'TEAM C' || toUpper(x) === 'ALL');
 
-    // بناء استعلام الأطباء — case-insensitive على teamArea
+    // بناء استعلام الأطباء — case-insensitive على area
     const doctorQuery = { adminId };
-    if (userTeamAreaList.length > 0) {
-      const areaRegex = userTeamAreaList.map((v) => new RegExp(`^${escapeRegex(v)}$`, 'i'));
-      doctorQuery.teamArea = { $in: areaRegex };
+    if (userAreaList.length > 0) {
+      const areaRegex = userAreaList.map((v) => new RegExp(`^${escapeRegex(v)}$`, 'i'));
+      doctorQuery.area = { $in: areaRegex };
     }
 
     // بناء استعلام المنتجات — case-insensitive على teamProducts
@@ -60,7 +60,7 @@ const getMedicalRepData = async (req, res) => {
       Doctor.find(doctorQuery)
         .select('drName specialty city teamProducts teamArea organizationName telNumber area')
         .lean(),
-      Product.find(productQuery)
+      ProductsModel.find(productQuery)
         .select('CODE PRODUCT PRODUCT_TYPE PRICE BRAND COMPANY teamProducts messages')
         .lean(),
     ]);

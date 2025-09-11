@@ -37,7 +37,7 @@ const upload = multer({
 router.post("/", isAuthenticated, checkRole(["ADMIN", "SYSTEM_ADMIN"]), createMarketingActivity);
 
 // GET /api/marketing-activities - جلب جميع الأنشطة التسويقية
-router.get("/", isAuthenticated, checkRole(["ADMIN", "SYSTEM_ADMIN"]), getAllMarketingActivities);
+router.get("/", isAuthenticated, checkRole(["ADMIN", "MEDICAL REP", "MEDICAL_REP"]), getAllMarketingActivities);
 
 // GET /api/marketing-activities/export-excel - تصدير Excel
 router.get("/export-excel", isAuthenticated, checkRole(["ADMIN", "SYSTEM_ADMIN"]), exportMarketingActivitiesToExcel);

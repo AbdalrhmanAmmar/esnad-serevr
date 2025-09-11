@@ -4,6 +4,7 @@ import {
   importDoctors,
   createDoctor,
   getDoctors,
+  getDoctorById,
   updateDoctor,
   deleteDoctor,
   exportDoctors,
@@ -23,6 +24,7 @@ router.get("/export", isAuthenticated, checkRole(["ADMIN"]), exportDoctors);
 // CRUD
 router.post("/", isAuthenticated, checkRole(["ADMIN"]), createDoctor);
 router.get("/", isAuthenticated, checkRole(["ADMIN"]), getDoctors);
+router.get("/:id", isAuthenticated, checkRole(["ADMIN"]), getDoctorById);
 router.put("/:id", isAuthenticated, checkRole(["ADMIN"]), updateDoctor);
 router.delete("/:id", isAuthenticated, checkRole(["ADMIN"]), deleteDoctor);
 

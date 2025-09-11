@@ -3,12 +3,18 @@ import jwt from 'jsonwebtoken';
 /**
  * Generate JWT token for user
  * @param {string} userId - User ID to encode in token
+ * @param {object} additionalData - Additional data to include in token (optional)
  * @param {string} expiresIn - Token expiration time (optional)
  * @returns {string} JWT token
  */
-export const generateToken = (userId, expiresIn = null) => {
+export const generateToken = (userId, additionalData = {}, expiresIn = null) => {
+  const payload = {
+    userId,
+    ...additionalData
+  };
+  
   return jwt.sign(
-    { userId },
+    payload,
     process.env.JWT_SECRET,
     { expiresIn: expiresIn || process.env.JWT_EXPIRES_IN || '7d' }
   );

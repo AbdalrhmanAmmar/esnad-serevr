@@ -7,37 +7,61 @@ import {
   updateVisit,
   deleteVisit,
   getMedicalRepVisitStats,
-  getAdminVisitStats
+  getAdminVisitStats,
+  getFilterOptions,
+  getDetailedVisitsByMedicalRep,
+  exportVisitsToExcel
 } from '../controllers/Formvisitdoctormedicalrep.controller.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { isAuthenticated } from '../middleware/auth.js';
 import { checkRole } from '../middleware/chekRole.js';
 
 const router = express.Router();
 
 // تطبيق المصادقة على جميع الروتات
-router.use(authenticateToken);
+router.use(isAuthenticated);
 
 // === روتات إنشاء وإدارة الزيارات ===
 
 // إنشاء زيارة جديدة للمندوب الطبي
 // POST /api/visit-forms/medical-rep/:medicalRepId/visits
 router.post('/medical-rep/:medicalRepId/visits', 
-  checkRole(['medical_rep', 'admin', 'supervisor']), 
+  checkRole(['MEDICAL REP', 'admin', 'supervisor']), 
   createVisit
 );
 
 // الحصول على جميع زيارات مندوب معين
 // GET /api/visit-forms/medical-rep/:medicalRepId/visits
 router.get('/medical-rep/:medicalRepId/visits', 
-  checkRole(['medical_rep', 'admin', 'supervisor']), 
+  checkRole(['MEDICAL REP', 'admin', 'supervisor']), 
   getVisitsByMedicalRep
 );
 
 // الحصول على إحصائيات زيارات المندوب
 // GET /api/visit-forms/medical-rep/:medicalRepId/stats
 router.get('/medical-rep/:medicalRepId/stats', 
-  checkRole(['medical_rep', 'admin', 'supervisor']), 
+  checkRole(['MEDICAL REP', 'admin', 'supervisor']), 
   getMedicalRepVisitStats
+);
+
+// الحصول على قوائم الفلاتر المتاحة للمندوب
+// GET /api/visit-forms/medical-rep/:medicalRepId/filter-options
+router.get('/medical-rep/:medicalRepId/filter-options', 
+  checkRole(['MEDICAL REP', 'admin', 'supervisor']), 
+  getFilterOptions
+);
+
+// الحصول على تفاصيل زيارات المندوب مع فلترة شاملة وإحصائيات
+// GET /api/visit-forms/medical-rep/:medicalRepId/detailed-visits
+router.get('/medical-rep/:medicalRepId/detailed-visits', 
+  checkRole(['MEDICAL REP', 'admin', 'supervisor']), 
+  getDetailedVisitsByMedicalRep
+);
+
+// تصدير الزيارات إلى Excel
+// GET /api/visit-forms/medical-rep/:medicalRepId/export-excel
+router.get('/medical-rep/:medicalRepId/export-excel', 
+  checkRole(['MEDICAL REP', 'admin', 'supervisor']), 
+  exportVisitsToExcel
 );
 
 // === روتات الأدمن ===

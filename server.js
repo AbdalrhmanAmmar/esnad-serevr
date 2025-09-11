@@ -11,6 +11,12 @@ import marketingActivitiesRoutes from "./routes/marketingActivities.routes.js";
 import supervisorRoutes from "./routes/supervisor.routes.js";
 import medicalrepRoutes from "./routes/medicalrep.routes.js";
 import formvisitdoctormedicalrepRoutes from "./routes/formvisitdoctormedicalrep.routes.js";
+import pharmacyRoutes from "./routes/pharmacy.routes.js";
+import simpleFormRequestRoutes from "./routes/simpleFormRequest.routes.js";
+import marketingActivitRequestRoutes from "./routes/marketingActivitRequest.routes.js";
+import pharmacyRequestFormRoutes from "./routes/PharmacyRequestForm.routes.js";
+import salesRepRoutes from "./routes/salesRep.routes.js";
+import financialPharmacyFormRoutes from "./routes/financialPharmacyForm.routes.js";
 import cors from "cors";
 
 
@@ -47,6 +53,12 @@ app.use("/api/marketing-activities", marketingActivitiesRoutes);
 app.use("/api/supervisor", supervisorRoutes);
 app.use("/api/medicalrep", medicalrepRoutes);
 app.use("/api/visit-forms", formvisitdoctormedicalrepRoutes);
+app.use("/api/pharmacies", pharmacyRoutes);
+app.use("/api/sample-requests", simpleFormRequestRoutes);
+app.use("/api/marketing-activity-requests", marketingActivitRequestRoutes);
+app.use("/api/pharmacy-requests", pharmacyRequestFormRoutes);
+app.use("/api/sales-rep", salesRepRoutes);
+app.use("/api/financial-pharmacy", financialPharmacyFormRoutes);
 
 const PORT = process.env.PORT || 4000;
 

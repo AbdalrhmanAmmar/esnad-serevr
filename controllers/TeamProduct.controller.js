@@ -1,6 +1,7 @@
 import DoctorModel from "../modals/Doctor.model.js";
 import ProductsModel from "../modals/Product.modal.js";
 import UserModel from "../modals/User.model.js";
+import PharmacyModel from "../models/Pharmacy.model.js";
 
 /**
  * @route   GET /api/users/:id/resources
@@ -22,7 +23,7 @@ export const getUserResources = async (req, res) => {
 
     // 1) جِب المستخدم
     const user = await UserModel.findById(id)
-      .select("username teamProducts teamArea")
+      .select("username teamProducts area")
       .lean();
 
     if (!user) {
@@ -31,18 +32,18 @@ export const getUserResources = async (req, res) => {
 
     // قوائم (لو حد كاتب أكتر من قيمة)
     const userTeamProductsList = toList(user.teamProducts);
-    const userTeamAreaList = toList(user.teamArea);
+    const userAreaList = Array.isArray(user.area) ? user.area : toList(user.area);
 
     // Flags
     const isAllProducts =
       userTeamProductsList.length === 0 ||
       userTeamProductsList.some((x) => toUpper(x) === "TEAM C" || toUpper(x) === "ALL");
 
-    // 2) بناء استعلام الأطباء — دائماً نفلتر بالـ teamArea
-    // لو teamArea عند المستخدم فاضي → مش هنرجّع أطباء (أأمن من إرجاع الكل بالخطأ)
+    // 2) بناء استعلام الأطباء — دائماً نفلتر بالـ area
+    // لو area عند المستخدم فاضي → مش هنرجّع أطباء (أأمن من إرجاع الكل بالخطأ)
     const doctorQuery = {};
-    if (userTeamAreaList.length > 0) {
-      doctorQuery.teamArea = { $in: userTeamAreaList };
+    if (userAreaList.length > 0) {
+      doctorQuery.area = { $in: userAreaList };
     } else {
       // لو عايز في الحالة دي ترجع ولا طبيب:
       doctorQuery._id = { $exists: false }; // يجبر النتيجة تكون فاضية
@@ -56,17 +57,28 @@ export const getUserResources = async (req, res) => {
       productQuery.teamProducts = { $in: userTeamProductsList };
     }
 
-    // 4) الاستعلامات (نرجّع messages أيضًا)
-    const [doctors, productsRaw] = await Promise.all([
+    // 4) بناء استعلام الصيدليات — نفس منطق الأطباء
+    const pharmacyQuery = {};
+    if (userAreaList.length > 0) {
+      pharmacyQuery.area = { $in: userAreaList };
+    } else {
+      pharmacyQuery._id = { $exists: false }; // يجبر النتيجة تكون فاضية
+    }
+
+    // 5) الاستعلامات (نرجّع messages أيضًا)
+    const [doctors, productsRaw, pharmacies] = await Promise.all([
       DoctorModel.find(doctorQuery)
-        .select("drName specialty city teamProducts teamArea organizationName") // الحقول المهمة
+        .select("drName specialty city teamProducts area organizationName") // الحقول المهمة
         .lean(),
       ProductsModel.find(productQuery)
         .select("CODE PRODUCT PRODUCT_TYPE PRICE BRAND COMPANY teamProducts messages")
         .lean(),
+      PharmacyModel.find(pharmacyQuery)
+        .select("customerSystemDescription area city district") // الحقول المهمة للصيدليات
+        .lean(),
     ]);
 
-    // 5) تأكيد أن messages مصفوفة
+    // 6) تأكيد أن messages مصفوفة
     const products = productsRaw.map((p) => ({
       ...p,
       messages: Array.isArray(p.messages) ? p.messages : [],
@@ -78,10 +90,11 @@ export const getUserResources = async (req, res) => {
         id: user._id,
         username: user.username,
         teamProducts: user.teamProducts,
-        teamArea: user.teamArea,
+        area: user.area,
       },
       doctors,
       products,
+      pharmacies,
     });
   } catch (error) {
     console.error("❌ Error in getUserResources:", error);

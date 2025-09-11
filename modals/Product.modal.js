@@ -1,13 +1,13 @@
 import mongoose from "mongoose";
 
-// 📨 سكيما للرسائل الفرعية
 const MessageSubSchema = new mongoose.Schema(
   {
-    text: { type: String, required: true, trim: true }, // نص الرسالة
-    tag:  { type: String, trim: true },                 // اختياري: رقم أو label للرسالة
-    lang: { type: String, default: "ar" },              // لغة الرسالة (افتراضي: عربي)
+    text: { type: String, required: true, trim: true },
+    tag:  { type: String, trim: true },     // مثلاً: "1" أو "A"
+    lang: { type: String, default: "ar" },
+    createdAt: { type: Date, default: Date.now }
   },
-  { _id: false } // مش محتاج id منفصل لكل رسالة
+  { _id: true } // تفعيل ID للرسائل لاستخدامها في formvisitdoctor
 );
 
 const ProductsSchema = new mongoose.Schema(
@@ -20,22 +20,36 @@ const ProductsSchema = new mongoose.Schema(
     COMPANY:      { type: String, trim: true },
     PRICE:        { type: Number, required: true, default: 0 },
 
-    // 👇 هنا الرسائل (3 رسائل لكل منتج)
     messages: {
       type: [MessageSubSchema],
       default: [],
-      validate: {
-        validator: function (arr) {
-          return arr.length <= 3; // بحد أقصى ٣ رسائل
+      validate: [
+        {
+          validator: function (arr) {
+            return arr.length <= 3; // حد أقصى 3
+          },
+          message: "كل منتج لا يمكن أن يحتوي على أكثر من 3 رسائل",
         },
-        message: "كل منتج لا يمكن أن يحتوي على أكثر من 3 رسائل",
-      },
+        {
+          // منع تكرار (lang + tag) مثلاً
+          validator: function (arr) {
+            const seen = new Set();
+            for (const m of arr) {
+              const key = `${(m.lang||'ar').toLowerCase()}|${(m.tag||'').toLowerCase()}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+            }
+            return true;
+          },
+          message: "لا يمكن تكرار نفس (اللغة + الوسم) داخل نفس المنتج",
+        }
+      ],
     },
-      adminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
 
+    adminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
   },
   { timestamps: true }
 );
 
-const ProductsModel = mongoose.model("Products", ProductsSchema);
+const ProductsModel = mongoose.model("Product", ProductsSchema);
 export default ProductsModel;

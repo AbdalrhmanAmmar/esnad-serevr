@@ -1,7 +1,9 @@
+import mongoose from 'mongoose';
 import VisitDoctorForm from '../modals/VisitDoctorForm.model.js';
 import UserModel from '../modals/User.model.js';
 import Doctor from '../modals/Doctor.model.js';
-import Product from '../modals/Product.modal.js';
+import ProductsModel from '../modals/Product.modal.js';
+import XLSX from 'xlsx';
 
 // إنشاء زيارة جديدة
 const createVisit = async (req, res) => {
@@ -35,10 +37,17 @@ const createVisit = async (req, res) => {
 
     // التحقق من صحة بيانات المنتجات
     for (const product of products) {
-      if (!product.productId || !product.messageId) {
+      if (!product.productId || !product.messageId || product.samplesCount === undefined) {
         return res.status(400).json({
           success: false,
-          message: 'كل منتج يجب أن يحتوي على معرف المنتج ومعرف الرسالة'
+          message: 'كل منتج يجب أن يحتوي على معرف المنتج ومعرف الرسالة وعدد العينات'
+        });
+      }
+      
+      if (product.samplesCount < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'عدد العينات يجب أن يكون رقم موجب أو صفر'
         });
       }
     }
@@ -104,10 +113,22 @@ const createVisit = async (req, res) => {
 const getVisitsByMedicalRep = async (req, res) => {
   try {
     const { medicalRepId } = req.params;
-    const { page = 1, limit = 10, startDate, endDate, doctorName } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      startDate, 
+      endDate, 
+      doctorName,
+      specialization,
+      clinic,
+      brand,
+      products // يمكن أن يكون array من معرفات المنتجات (حتى 3)
+    } = req.query;
 
-    // بناء الاستعلام
+    // بناء الاستعلام الأساسي
     const query = { medicalRepId };
+    let doctorQuery = {};
+    let productQuery = {};
 
     // فلترة بالتاريخ
     if (startDate || endDate) {
@@ -116,11 +137,74 @@ const getVisitsByMedicalRep = async (req, res) => {
       if (endDate) query.visitDate.$lte = new Date(endDate);
     }
 
-    // فلترة باسم الطبيب
+    // بناء استعلام الأطباء
     if (doctorName) {
-      const doctors = await Doctor.find({ drName: { $regex: doctorName, $options: 'i' } });
-      const doctorIds = doctors.map(doc => doc._id);
+      doctorQuery.drName = { $regex: doctorName, $options: 'i' };
+    }
+    if (specialization) {
+      doctorQuery.specialization = { $regex: specialization, $options: 'i' };
+    }
+    if (clinic) {
+      doctorQuery.organizationName = { $regex: clinic, $options: 'i' };
+    }
+
+    // البحث عن الأطباء المطابقين للفلاتر
+    let doctorIds = [];
+    if (Object.keys(doctorQuery).length > 0) {
+      const doctors = await Doctor.find(doctorQuery).select('_id');
+      doctorIds = doctors.map(doc => doc._id);
+      if (doctorIds.length === 0) {
+        // إذا لم يتم العثور على أطباء مطابقين، إرجاع نتيجة فارغة
+        return res.status(200).json({
+          success: true,
+          data: {
+            visits: [],
+            pagination: {
+              currentPage: parseInt(page),
+              totalPages: 0,
+              totalCount: 0,
+              hasNext: false,
+              hasPrev: false
+            }
+          }
+        });
+      }
       query.doctorId = { $in: doctorIds };
+    }
+
+    // بناء استعلام المنتجات
+    let productIds = [];
+    if (brand) {
+      productQuery.BRAND = { $regex: brand, $options: 'i' };
+    }
+    if (products && Array.isArray(products) && products.length > 0) {
+      // فلترة بمعرفات المنتجات المحددة (حتى 3 منتجات)
+      const selectedProducts = products.slice(0, 3); // أخذ أول 3 منتجات فقط
+      productQuery._id = { $in: selectedProducts };
+    }
+
+    // البحث عن المنتجات المطابقة للفلاتر
+    if (Object.keys(productQuery).length > 0) {
+      const matchedProducts = await ProductsModel.find(productQuery).select('_id');
+      productIds = matchedProducts.map(product => product._id);
+      if (productIds.length === 0) {
+        // إذا لم يتم العثور على منتجات مطابقة، إرجاع نتيجة فارغة
+        return res.status(200).json({
+          success: true,
+          data: {
+            visits: [],
+            pagination: {
+              currentPage: parseInt(page),
+              totalPages: 0,
+              totalCount: 0,
+              hasNext: false,
+              hasPrev: false
+            }
+          }
+        });
+      }
+      // فلترة الزيارات التي تحتوي على هذه المنتجات
+      query['products.productId'] = { $in: productIds };
     }
 
     const skip = (page - 1) * limit;
@@ -148,6 +232,16 @@ const getVisitsByMedicalRep = async (req, res) => {
           totalCount,
           hasNext: page * limit < totalCount,
           hasPrev: page > 1
+        },
+        filters: {
+          applied: {
+            doctorName: doctorName || null,
+            specialization: specialization || null,
+            clinic: clinic || null,
+            brand: brand || null,
+            products: products || null,
+            dateRange: { startDate: startDate || null, endDate: endDate || null }
+          }
         }
       }
     });
@@ -296,6 +390,25 @@ const updateVisit = async (req, res) => {
           success: false,
           message: 'المشرف غير موجود'
         });
+      }
+    }
+
+    // التحقق من صحة بيانات المنتجات إذا تم تحديثها
+    if (updateData.products && Array.isArray(updateData.products)) {
+      for (const product of updateData.products) {
+        if (!product.productId || !product.messageId || product.samplesCount === undefined) {
+          return res.status(400).json({
+            success: false,
+            message: 'كل منتج يجب أن يحتوي على معرف المنتج ومعرف الرسالة وعدد العينات'
+          });
+        }
+        
+        if (product.samplesCount < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'عدد العينات يجب أن يكون رقم موجب أو صفر'
+          });
+        }
       }
     }
 
@@ -481,6 +594,387 @@ const getAdminVisitStats = async (req, res) => {
   }
 };
 
+// الحصول على قوائم الفلاتر المتاحة
+const getFilterOptions = async (req, res) => {
+  try {
+    // الحصول على قوائم الفلاتر المتاحة
+    const [doctors, products] = await Promise.all([
+      Doctor.find({}, 'drName specialty organizationName brand segment').lean(),
+      ProductsModel.find({}, 'CODE PRODUCT BRAND COMPANY').lean()
+    ]);
+
+    // استخراج القيم الفريدة
+    const doctorNames = [...new Set(doctors.map(doc => doc.drName))].filter(Boolean);
+    const specializations = [...new Set(doctors.map(doc => doc.specialty))].filter(Boolean);
+    const clinics = [...new Set(doctors.map(doc => doc.organizationName))].filter(Boolean);
+    const brands = [...new Set([
+      ...doctors.map(doc => doc.brand),
+      ...products.map(prod => prod.BRAND)
+    ])].filter(Boolean);
+    const segments = [...new Set(doctors.map(doc => doc.segment))].filter(Boolean);
+    const companies = [...new Set(products.map(prod => prod.COMPANY))].filter(Boolean);
+    const productsList = products.map(prod => ({
+      id: prod._id,
+      code: prod.CODE,
+      name: prod.PRODUCT,
+      brand: prod.BRAND,
+      company: prod.COMPANY
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        doctorNames: doctorNames.sort(),
+        specializations: specializations.sort(),
+        clinics: clinics.sort(),
+        brands: brands.sort(),
+        segments: segments.sort(),
+        companies: companies.sort(),
+        products: productsList
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in getFilterOptions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'خطأ في الخادم الداخلي',
+      error: error.message
+    });
+  }
+};
+
+// دالة متقدمة للحصول على تفاصيل زيارات المندوب مع فلترة شاملة وإحصائيات
+const getDetailedVisitsByMedicalRep = async (req, res) => {
+  try {
+    const { medicalRepId } = req.params;
+    const {
+      page = 1,
+      limit = 10,
+      startDate,
+      endDate,
+      doctorName,
+      specialization,
+      segment,
+      clinic,
+      brand,
+      products
+    } = req.query;
+
+    // بناء الاستعلام الأساسي
+    let query = { medicalRepId };
+
+    // فلترة بالتاريخ
+    if (startDate || endDate) {
+      query.visitDate = {};
+      if (startDate) query.visitDate.$gte = new Date(startDate);
+      if (endDate) query.visitDate.$lte = new Date(endDate);
+    }
+
+    // فلترة بالأطباء والتخصصات والعيادات
+    let doctorQuery = {};
+    if (doctorName) {
+      doctorQuery.drName = { $regex: doctorName, $options: 'i' };
+    }
+    if (specialization) {
+      doctorQuery.specialty = { $regex: specialization, $options: 'i' };
+    }
+    if (segment) {
+      doctorQuery.segment = { $regex: segment, $options: 'i' };
+    }
+    if (clinic) {
+      doctorQuery.organizationName = { $regex: clinic, $options: 'i' };
+    }
+    if (brand) {
+      doctorQuery.brand = { $regex: brand, $options: 'i' };
+    }
+
+    // البحث عن الأطباء المطابقين للفلاتر
+    if (Object.keys(doctorQuery).length > 0) {
+      const matchingDoctors = await Doctor.find(doctorQuery, '_id');
+      const doctorIds = matchingDoctors.map(doc => doc._id);
+      query.doctorId = { $in: doctorIds };
+    }
+
+    // فلترة بالمنتجات
+    if (products) {
+      const productArray = Array.isArray(products) ? products : [products];
+      const productIds = [];
+      
+      for (const productFilter of productArray) {
+        if (mongoose.Types.ObjectId.isValid(productFilter)) {
+          productIds.push(new mongoose.Types.ObjectId(productFilter));
+        } else {
+          // البحث بالاسم أو الكود
+          const foundProducts = await ProductsModel.find({
+            $or: [
+              { PRODUCT: { $regex: productFilter, $options: 'i' } },
+              { CODE: { $regex: productFilter, $options: 'i' } },
+              { BRAND: { $regex: productFilter, $options: 'i' } }
+            ]
+          }, '_id');
+          productIds.push(...foundProducts.map(p => p._id));
+        }
+      }
+      
+      if (productIds.length > 0) {
+        query['products.productId'] = { $in: productIds };
+      }
+    }
+
+    const skip = (page - 1) * limit;
+
+    // الحصول على الزيارات مع التفاصيل الكاملة
+    const [visits, totalCount] = await Promise.all([
+      VisitDoctorForm.find(query)
+        .populate('medicalRepId', 'firstName lastName username teamProducts teamArea')
+        .populate('supervisorId', 'firstName lastName username')
+        .populate({
+          path: 'products.productId',
+          select: 'CODE PRODUCT BRAND COMPANY'
+        })
+        .populate({
+          path: 'doctorId',
+          select: 'drName specialty organizationName organizationType telNumber profile district city area brand segment targetFrequency keyOpinionLeader teamProducts teamArea'
+        })
+        .sort({ visitDate: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      VisitDoctorForm.countDocuments(query)
+    ]);
+
+    // حساب الإحصائيات
+    const statsQuery = { medicalRepId };
+    if (startDate || endDate) {
+      statsQuery.visitDate = {};
+      if (startDate) statsQuery.visitDate.$gte = new Date(startDate);
+      if (endDate) statsQuery.visitDate.$lte = new Date(endDate);
+    }
+
+    const [totalVisits, uniqueDoctors, totalSamples] = await Promise.all([
+      VisitDoctorForm.countDocuments(statsQuery),
+      VisitDoctorForm.distinct('doctorId', statsQuery).then(ids => ids.length),
+      VisitDoctorForm.aggregate([
+        { $match: statsQuery },
+        { $unwind: '$products' },
+        { $group: { _id: null, totalSamples: { $sum: '$products.samplesCount' } } }
+      ]).then(result => result[0]?.totalSamples || 0)
+    ]);
+
+    // تنسيق البيانات لإزالة الرسائل من المنتجات
+    const formattedVisits = visits.map(visit => ({
+      ...visit,
+      products: visit.products.map(product => ({
+        productId: product.productId,
+        samplesCount: product.samplesCount
+      }))
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        visits: formattedVisits,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalCount / limit),
+          totalCount,
+          hasNext: page * limit < totalCount,
+          hasPrev: page > 1
+        },
+        statistics: {
+          totalVisits,
+          uniqueDoctorsVisited: uniqueDoctors,
+          totalSamplesDistributed: totalSamples
+        },
+        filters: {
+          applied: {
+            dateRange: { startDate: startDate || null, endDate: endDate || null },
+            doctorName: doctorName || null,
+            specialization: specialization || null,
+            segment: segment || null,
+            clinic: clinic || null,
+            brand: brand || null,
+            products: products || null
+          }
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in getDetailedVisitsByMedicalRep:', error);
+    res.status(500).json({
+      success: false,
+      message: 'خطأ في الخادم الداخلي',
+      error: error.message
+    });
+  }
+};
+
+// تصدير الزيارات المفلترة إلى Excel
+const exportVisitsToExcel = async (req, res) => {
+  try {
+    const { medicalRepId } = req.params;
+    const {
+      startDate,
+      endDate,
+      doctorName,
+      specialization,
+      segment,
+      clinic,
+      brand,
+      products
+    } = req.query;
+
+    // بناء الاستعلام الأساسي
+    let query = { medicalRepId };
+
+    // فلترة بالتاريخ
+    if (startDate || endDate) {
+      query.visitDate = {};
+      if (startDate) query.visitDate.$gte = new Date(startDate);
+      if (endDate) query.visitDate.$lte = new Date(endDate);
+    }
+
+    // فلترة بالأطباء والتخصصات والعيادات
+    let doctorQuery = {};
+    if (doctorName) {
+      doctorQuery.drName = { $regex: doctorName, $options: 'i' };
+    }
+    if (specialization) {
+      doctorQuery.specialty = { $regex: specialization, $options: 'i' };
+    }
+    if (segment) {
+      doctorQuery.segment = { $regex: segment, $options: 'i' };
+    }
+    if (clinic) {
+      doctorQuery.organizationName = { $regex: clinic, $options: 'i' };
+    }
+    if (brand) {
+      doctorQuery.brand = { $regex: brand, $options: 'i' };
+    }
+
+    // البحث عن الأطباء المطابقين للفلاتر
+    if (Object.keys(doctorQuery).length > 0) {
+      const doctors = await Doctor.find(doctorQuery).select('_id');
+      const doctorIds = doctors.map(doc => doc._id);
+      if (doctorIds.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'لا توجد زيارات تطابق الفلترة المحددة'
+        });
+      }
+      query.doctorId = { $in: doctorIds };
+    }
+
+    // فلترة بالمنتجات
+    if (products) {
+      const productArray = Array.isArray(products) ? products : [products];
+      const productIds = productArray.filter(id => mongoose.Types.ObjectId.isValid(id));
+      if (productIds.length > 0) {
+        query['products.productId'] = { $in: productIds };
+      }
+    }
+
+    // الحصول على البيانات مع populate
+    const visits = await VisitDoctorForm.find(query)
+      .populate('medicalRepId', 'firstName lastName username')
+      .populate('supervisorId', 'firstName lastName username')
+      .populate('doctorId', 'drName specialization phone organizationName city segment brand')
+      .populate('products.productId', 'CODE PRODUCT BRAND messages')
+      .sort({ visitDate: -1 })
+      .lean();
+
+    if (visits.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'لا توجد زيارات تطابق الفلترة المحددة'
+      });
+    }
+
+    // حساب الإحصائيات
+    const uniqueDoctors = new Set(visits.map(visit => visit.doctorId._id.toString())).size;
+    const totalSamples = visits.reduce((sum, visit) => {
+      return sum + visit.products.reduce((productSum, product) => {
+        return productSum + (product.samplesCount || 0);
+      }, 0);
+    }, 0);
+
+    // تحضير البيانات للـ Excel
+    const excelData = visits.map((visit, index) => {
+      const productsInfo = visit.products.map(product => {
+        return {
+          name: product.productId ? product.productId.PRODUCT : 'غير محدد',
+          samples: product.samplesCount || 0
+        };
+      });
+
+      return {
+        'الرقم': index + 1,
+        'تاريخ الزيارة': new Date(visit.visitDate).toLocaleDateString('ar-EG'),
+        'اسم الدكتور': visit.doctorId.drName || '',
+        'التخصص': visit.doctorId.specialization || '',
+        'التصنيف': visit.doctorId.segment || '',
+        'المدينة': visit.doctorId.city || '',
+        'العيادة': visit.doctorId.organizationName || '',
+        'العلامة التجارية': visit.doctorId.brand || '',
+        'المنتجات': productsInfo.map(p => p.name).join(', '),
+        'عدد العينات': productsInfo.reduce((sum, p) => sum + p.samples, 0),
+        'المندوب الطبي': `${visit.medicalRepId.firstName || ''} ${visit.medicalRepId.lastName || ''}`.trim(),
+        'ملاحظات الزيارة': visit.notes || ''
+      };
+    });
+
+    // إضافة صف الإحصائيات في النهاية
+    excelData.push({
+      'الرقم': '',
+      'تاريخ الزيارة': '',
+      'اسم الدكتور': '',
+      'التخصص': '',
+      'التصنيف': '',
+      'المدينة': '',
+      'العلامة التجارية': '',
+      'المنتجات': 'إجمالي الإحصائيات:',
+      'عدد العينات': totalSamples,
+      'المندوب الطبي': `عدد الزيارات: ${visits.length}`,
+      'ملاحظات الزيارة': `عدد الأطباء: ${uniqueDoctors}`
+    });
+
+    // إنشاء workbook و worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    // إضافة worksheet للـ workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'تقرير الزيارات');
+    
+    // تحويل لـ buffer
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // إعداد headers للتحميل
+    const medicalRepName = visits[0]?.medicalRepId ? 
+      `${visits[0].medicalRepId.firstName || ''}_${visits[0].medicalRepId.lastName || ''}`.replace(/\s+/g, '_') : 'مندوب';
+    const dateRange = startDate && endDate 
+      ? `_${startDate}_to_${endDate}`
+      : `_${new Date().toISOString().split('T')[0]}`;
+    const filename = `visits_report_${medicalRepName}${dateRange}.xlsx`;
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    
+    // إرسال الملف
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'حدث خطأ أثناء تصدير البيانات',
+      error: error.message
+    });
+  }
+};
+
 export {
   createVisit,
   getVisitsByMedicalRep,
@@ -489,5 +983,8 @@ export {
   updateVisit,
   deleteVisit,
   getMedicalRepVisitStats,
-  getAdminVisitStats
+  getAdminVisitStats,
+  getFilterOptions,
+  getDetailedVisitsByMedicalRep,
+  exportVisitsToExcel
 };

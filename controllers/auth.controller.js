@@ -18,7 +18,7 @@ export const login = async (req, res) => {
     // Find user by username (case insensitive)
     const user = await UserModel.findOne({ 
       username: { $regex: new RegExp(`^${username}$`, 'i') }
-    }).populate('supervisor', 'firstName lastName username role');
+    }).populate('supervisor', 'firstName lastName username role adminId');
 
     if (!user) {
       return res.status(401).json({
@@ -44,8 +44,11 @@ export const login = async (req, res) => {
       });
     }
 
-    // Generate token
-    const token = generateToken(user._id);
+    // Generate token with additional data
+    const token = generateToken(user._id, {
+      adminId: user.adminId,
+      role: user.role
+    });
 
     // Remove password from user object
     const userResponse = {

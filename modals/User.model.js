@@ -23,8 +23,9 @@ const UserSchema = new mongoose.Schema(
       enum: [
         "SYSTEM_ADMIN",
         "ADMIN",
-        "MEDICAL_REP",
-        "SALES_REP",
+        "MEDICAL REP",
+        "MEDICAL REP",
+        "SALES REP",
         "SUPERVISOR",
         "MANAGER",
         "TEAM_LEAD",
@@ -40,7 +41,7 @@ const UserSchema = new mongoose.Schema(
     teamArea:     { type: String, trim: true, set: normUpper }, // "EAST TEAM" ... إلخ
 
     // بيانات الموقع (ملخّص؛ لو عايز مناطق متعددة استخدم Collection منفصلة)
-    area:         { type: String, trim: true },
+    area:         [{ type: String, trim: true }], // array لدعم مناطق متعددة
     city:         { type: String, trim: true },
     district:     { type: String, trim: true },
 

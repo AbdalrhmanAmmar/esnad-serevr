@@ -30,7 +30,12 @@ export const isAuthenticated = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    // Add token data to user object
+    req.user = {
+      ...user.toObject(),
+      tokenAdminId: decoded.adminId,
+      tokenRole: decoded.role
+    };
     next();
   } catch (error) {
     return res.status(401).json({

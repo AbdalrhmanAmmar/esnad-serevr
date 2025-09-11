@@ -206,6 +206,42 @@ export const getDoctors = async (req, res) => {
   }
 };
 
+// الحصول على طبيب واحد بالمعرف
+export const getDoctorById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // التحقق من صحة المعرف
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'معرف الطبيب غير صحيح'
+      });
+    }
+    
+    const doctor = await DoctorModel.findById(id);
+    
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'الطبيب غير موجود'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: doctor
+    });
+  } catch (error) {
+    console.error('Error in getDoctorById:', error);
+    res.status(500).json({
+      success: false,
+      message: 'خطأ في الخادم الداخلي',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 // PUT /api/doctors/:id
 export const updateDoctor = async (req, res) => {
   try {

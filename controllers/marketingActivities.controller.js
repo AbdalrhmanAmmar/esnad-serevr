@@ -74,10 +74,23 @@ export const createMarketingActivity = async (req, res) => {
 export const getAllMarketingActivities = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, isActive } = req.query;
-    const adminId = req.user._id;
+    const { _id: userId, adminId: userAdminId, role } = req.user;
+
+    // تحديد adminId المناسب حسب دور المستخدم
+    let targetAdminId;
+    if (role === 'ADMIN') {
+      targetAdminId = userId;
+    } else if (role === 'MEDICAL_REP' || role === 'MEDICAL REP') {
+      targetAdminId = userAdminId;
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: 'غير مصرح لك بالوصول إلى هذه البيانات'
+      });
+    }
 
     // بناء فلتر البحث
-    const filter = { adminId };
+    const filter = { adminId: targetAdminId };
     
     if (search) {
       filter.$or = [

@@ -39,6 +39,12 @@ const VisitDoctorFormSchema = new mongoose.Schema({
       type: String,
       required: true,
       trim: true
+    },
+    samplesCount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0
     }
   }],
   
@@ -67,7 +73,7 @@ const VisitDoctorFormSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['completed', 'pending', 'cancelled'],
-    default: 'pe'
+    default: 'pending'
   },
   
   // تاريخ الإنشاء
