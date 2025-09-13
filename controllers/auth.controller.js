@@ -62,6 +62,7 @@ export const login = async (req, res) => {
       area: user.area,
       city: user.city,
       district: user.district,
+      adminId: user.adminId,
       supervisor: user.supervisor,
       isActive: user.isActive,
       createdAt: user.createdAt,

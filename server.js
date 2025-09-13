@@ -17,6 +17,8 @@ import marketingActivitRequestRoutes from "./routes/marketingActivitRequest.rout
 import pharmacyRequestFormRoutes from "./routes/PharmacyRequestForm.routes.js";
 import salesRepRoutes from "./routes/salesRep.routes.js";
 import financialPharmacyFormRoutes from "./routes/financialPharmacyForm.routes.js";
+import areaAnalyticsRoutes from "./routes/areaAnalytics.routes.js";
+import orderCollectorRoutes from "./routes/orderCollector.routes.js";
 import cors from "cors";
 
 
@@ -59,6 +61,8 @@ app.use("/api/marketing-activity-requests", marketingActivitRequestRoutes);
 app.use("/api/pharmacy-requests", pharmacyRequestFormRoutes);
 app.use("/api/sales-rep", salesRepRoutes);
 app.use("/api/financial-pharmacy", financialPharmacyFormRoutes);
+app.use("/api/area-analytics", areaAnalyticsRoutes);
+app.use("/api/order-collector", orderCollectorRoutes);
 
 const PORT = process.env.PORT || 4000;
 

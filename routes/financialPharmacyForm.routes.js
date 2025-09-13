@@ -3,7 +3,10 @@ import {
   getFinancialPharmacyData,
   updateCollectionStatus,
   getCollectionStatsByRep,
-  exportFinancialData
+  getSalesRepProductsData,
+  exportFinancialData,
+  updateOrderStatus,
+  getOrderStatusHistory
 } from '../controllers/FinancialPharmacyForm.controller.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { checkRole } from '../middleware/chekRole.js';
@@ -33,6 +36,26 @@ router.get('/stats/reps/:adminId',
 router.get('/export', 
   isAuthenticated, 
   exportFinancialData
+);
+
+// جلب بيانات المنتجات الخاصة بمندوبي المبيعات
+router.get('/:adminId/sales-products', 
+  isAuthenticated, 
+  // checkRole(['admin', 'superAdmin']), 
+  getSalesRepProductsData
+);
+
+// تعديل حالة الطلب (orderStatus)
+router.put('/order-status/:adminId/:requestId', 
+  isAuthenticated, 
+  updateOrderStatus
+);
+
+// جلب تاريخ تحديثات حالة الطلب
+router.get('/order-status-history/:orderId', 
+  isAuthenticated, 
+  // checkRole(['ADMIN', 'SUPER_ADMIN']), 
+  getOrderStatusHistory
 );
 
 export default router;

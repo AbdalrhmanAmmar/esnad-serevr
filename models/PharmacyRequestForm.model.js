@@ -59,6 +59,22 @@ const pharmacyRequestFormSchema = new mongoose.Schema({
     }
   },
 
+  // الحالة النهائية للطلبية
+  FinalOrderStatus: {
+    type: Boolean,
+    default: false
+  },
+
+  // حالة الطلبية النهائية (تظهر فقط عندما FinalOrderStatus = true)
+  FinalOrderStatusValue: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    required: function() {
+      return this.FinalOrderStatus === true;
+    }
+  },
+
   // تفاصيل الطلبية (تظهر فقط إذا كانت هناك طلبية)
   orderDetails: [{
     product: {
@@ -184,6 +200,18 @@ pharmacyRequestFormSchema.pre('save', function(next) {
     if (!this.collectionDetails.amount || !this.collectionDetails.receiptNumber || !this.collectionDetails.receiptImage) {
       return next(new Error('تفاصيل التحصيل مطلوبة عند وجود تحصيل'));
     }
+  }
+
+  // تحديث FinalOrderStatus تلقائياً عندما يصبح orderStatus approved
+  if (this.orderStatus === 'approved') {
+    this.FinalOrderStatus = true;
+    // تعيين القيمة الافتراضية للحالة النهائية
+    if (!this.FinalOrderStatusValue) {
+      this.FinalOrderStatusValue = 'pending';
+    }
+  } else {
+    this.FinalOrderStatus = false;
+    this.FinalOrderStatusValue = undefined;
   }
 
   next();

@@ -230,8 +230,8 @@ export const getPharmacyRequestFormById = async (req, res) => {
     const request = await PharmacyRequestForm.findOne(filter)
       .populate('pharmacy', 'name address phone')
       .populate('orderDetails.product', 'name price unit')
-      .populate('createdBy', 'name email')
-      .populate('adminId', 'name email');
+      .populate('createdBy', 'name ')
+      .populate('adminId', 'name ');
 
     if (!request) {
       return res.status(404).json({
@@ -431,6 +431,127 @@ export const updateRequestStatus = async (req, res) => {
       message: process.env.NODE_ENV === 'production' ? 'حدث خطأ في الخادم' : error.message
     });
   }
+};
+
+// جلب البيانات المالية لطلبات الصيدليات
+export const getFinancialPharmacyData = async (req, res) => {
+   try {
+     const { adminId } = req.params;
+     const { page = 1, limit = 10, status, startDate, endDate } = req.query;
+
+     // بناء الفلتر
+     const filter = {
+       adminId,
+       hasCollection: true // فقط الطلبات التي تحتوي على تحصيل
+     };
+
+     // فلترة حسب الحالة
+     if (status) {
+       filter.orderStatus = status;
+     }
+
+     // فلترة حسب التاريخ
+     if (startDate || endDate) {
+       filter.visitDate = {};
+       if (startDate) filter.visitDate.$gte = new Date(startDate);
+       if (endDate) filter.visitDate.$lte = new Date(endDate);
+     }
+
+     // حساب إجمالي عدد السجلات
+     const totalRecords = await PharmacyRequestForm.countDocuments(filter);
+
+     // جلب جميع البيانات للإحصائيات
+     const allData = await PharmacyRequestForm.find(filter)
+       .select({
+         collectionDetails: 1
+       })
+       .lean();
+
+     // جلب البيانات مع التصفح
+     const financialData = await PharmacyRequestForm.find(filter)
+       .populate({
+         path: 'createdBy',
+         select: 'firstName lastName email role'
+       })
+       .populate({
+         path: 'pharmacy',
+         select: 'customerSystemDescription area city district'
+       })
+       .select({
+         visitDate: 1,
+         orderDetails: 1,
+         orderStatus: 1,
+         createdBy: 1,
+         pharmacy: 1,
+         createdAt: 1,
+         hasCollection: 1,
+         collectionDetails: 1
+       })
+       .sort({ visitDate: -1 })
+       .skip((page - 1) * limit)
+       .limit(parseInt(limit))
+       .lean();
+
+     // حساب الإحصائيات
+     let totalAmount = 0;
+     let pendingAmount = 0;
+     let approvedAmount = 0;
+     let rejectedAmount = 0;
+
+     allData.forEach(item => {
+       const amount = item.collectionDetails?.amount || 0;
+       const status = item.collectionDetails?.collectionStatus || 'pending';
+       
+       totalAmount += amount;
+       
+       if (status === 'pending') {
+         pendingAmount += amount;
+       } else if (status === 'approved') {
+         approvedAmount += amount;
+       } else if (status === 'rejected') {
+         rejectedAmount += amount;
+       }
+     });
+
+     // تنسيق البيانات للإرجاع
+     const formattedData = financialData.map(item => ({
+       id: item._id,
+       visitDate: item.visitDate,
+       createdAt: item.createdAt,
+       repName: `${item.createdBy?.firstName || ''} ${item.createdBy?.lastName || ''}`.trim(),
+       repEmail: item.createdBy?.email || '',
+       pharmacyName: item.pharmacy?.customerSystemDescription || '',
+       pharmacyArea: item.pharmacy?.area || '',
+       pharmacyCity: item.pharmacy?.city || '',
+       amount: item.collectionDetails?.amount || 0,
+       receiptNumber: item.collectionDetails?.receiptNumber || '',
+       status: item.collectionDetails?.collectionStatus || 'pending',
+       receiptImage: item.collectionDetails?.receiptImage || ''
+     }));
+
+     res.status(200).json({
+       success: true,
+       message: 'تم جلب البيانات المالية بنجاح',
+       data: formattedData,
+       pagination: {
+         currentPage: parseInt(page),
+         totalPages: Math.ceil(totalRecords / limit),
+         totalRecords,
+         limit: parseInt(limit)
+       },
+       statistics: {
+         totalAmount,
+         pendingAmount,
+         approvedAmount,
+         rejectedAmount,
+         totalRecords
+       }
+     });
+
+   } catch (err) {
+     console.error('Financial data error:', err);
+     res.status(500).json({ success: false, message: err.message });
+   }
 };
 
 // إحصائيات طلبات الصيدليات
