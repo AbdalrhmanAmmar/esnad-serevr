@@ -96,88 +96,46 @@ createdAt: 1
 .sort({ visitDate: -1 })
 
 .skip(skip)
-
 .limit(parseInt(limit));
 
 // حساب العدد الإجمالي
-
 const totalCount = await PharmacyRequestForm.countDocuments(filter);
 
-// حساب الإحصائيات
+console.log('Sample financial data:', financialData.slice(0, 2));
+console.log('Total count:', totalCount);
 
-const stats = await PharmacyRequestForm.aggregate([
+// حساب الإحصائيات باستخدام reduce
+const statistics = financialData.reduce((acc, item) => {
+const amount = item.collectionDetails?.amount || 0;
+const status = item.collectionDetails?.collectionStatus;
 
-{ $match: filter },
+acc.totalAmount += amount;
+acc.totalRecords += 1;
 
-{
-
-$group: {
-
-_id: null,
-
-totalAmount: { $sum: '$collectionDetails.amount' },
-
-pendingAmount: {
-
-$sum: {
-
-$cond: [
-
-{ $eq: ['$collectionDetails.collectionStatus', 'pending'] },
-
-'$collectionDetails.amount',
-
-0
-
-]
-
+if (status === 'pending') {
+acc.pendingAmount += amount;
+acc.pendingCount += 1;
+} else if (status === 'approved') {
+acc.approvedAmount += amount;
+acc.approvedCount += 1;
+} else if (status === 'rejected') {
+acc.rejectedAmount += amount;
+acc.rejectedCount += 1;
 }
 
-},
+return acc;
+}, {
+totalAmount: 0,
+pendingAmount: 0,
+approvedAmount: 0,
+rejectedAmount: 0,
+pendingCount: 0,
+approvedCount: 0,
+rejectedCount: 0,
+totalRecords: 0
+});
 
-approvedAmount: {
-
-$sum: {
-
-$cond: [
-
-{ $eq: ['$collectionDetails.collectionStatus', 'approved'] },
-
-'$collectionDetails.amount',
-
-0
-
-]
-
-}
-
-},
-
-rejectedAmount: {
-
-$sum: {
-
-$cond: [
-
-{ $eq: ['$collectionDetails.collectionStatus', 'rejected'] },
-
-'$collectionDetails.amount',
-
-0
-
-]
-
-}
-
-},
-
-totalRecords: { $sum: 1 }
-
-}
-
-}
-
-]);
+console.log('Calculated statistics:', statistics);
 
 // تنسيق البيانات للاستجابة
 
@@ -229,19 +187,7 @@ limit: parseInt(limit)
 
 },
 
-statistics: stats[0] || {
-
-totalAmount: 0,
-
-pendingAmount: 0,
-
-approvedAmount: 0,
-
-rejectedAmount: 0,
-
-totalRecords: 0
-
-}
+statistics: statistics
 
 });
 
@@ -746,6 +692,7 @@ export const updateOrderStatus = async (req, res) => {
       { _id: requestId, adminId: adminId },
       {
         orderStatus: status,
+        FinalOrderStatus: true,
         ...(notes && { statusNotes: notes })
       },
       { new: true }
@@ -868,7 +815,6 @@ export const updateCollectionStatus = async (req, res) => {
       requestId,
       {
         'collectionDetails.collectionStatus': status,
-        ...(notes && { 'collectionDetails.statusNotes': notes })
       },
       { new: true }
     ).populate('createdBy', 'name email')

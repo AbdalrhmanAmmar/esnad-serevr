@@ -7,6 +7,8 @@ import {
   deletePharmacyRequestForm,
   updateRequestStatus,
   getPharmacyRequestStats,
+  getSalesRepFinalOrders,
+  getAllSalesRepFinalOrders,
   upload
 } from '../controllers/PharmacyRequestForm.controller.js';
 import { isAuthenticated } from '../middleware/auth.js';
@@ -89,6 +91,19 @@ router.get('/user/my-requests',
     next();
   },
   getPharmacyRequestForms
+);
+
+// جلب الطلبات النهائية لمندوب المبيعات
+// GET /api/pharmacy-requests/sales-rep/:salesRepId/final-orders
+router.get('/sales-rep/:salesRepId/final-orders',
+  checkRole(['SALES REP']),
+  getSalesRepFinalOrders
+);
+
+// Route للأدمن لجلب جميع الطلبات النهائية لجميع مندوبي المبيعات
+router.get('/admin/all-final-orders', 
+  checkRole(['ADMIN', 'superadmin']), 
+  getAllSalesRepFinalOrders
 );
 
 export default router;

@@ -116,7 +116,7 @@ export const createPharmacyRequestForm = async (req, res) => {
     const populatedRequest = await PharmacyRequestForm.findById(newRequest._id)
       .populate('pharmacy', 'name address phone')
       .populate('orderDetails.product', 'name price unit')
-      .populate('createdBy', 'name email')
+      .populate('createdBy', 'username')
       .populate('adminId', 'name email');
 
     res.status(201).json({
@@ -128,6 +128,76 @@ export const createPharmacyRequestForm = async (req, res) => {
   } catch (error) {
     console.error('خطأ في إنشاء طلب الصيدلية:', error);
     res.status(500).json({
+      success: false,
+      message: process.env.NODE_ENV === 'production' ? 'حدث خطأ في الخادم' : error.message
+    });
+  }
+};
+
+// دالة للأدمن لجلب جميع الطلبات النهائية لجميع مندوبي المبيعات
+export const getAllSalesRepFinalOrders = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // فلتر للطلبات النهائية فقط
+    const filter = {
+      FinalOrderStatus: true
+    };
+
+    // البحث عن جميع الطلبات النهائية
+    const orders = await PharmacyRequestForm.find(filter)
+    .populate('pharmacy', 'customerSystemDescription name address area')
+    .populate('orderDetails.product', 'PRODUCT CODE PRICE BRAND')
+    .populate('createdBy', 'username')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+
+    // حساب العدد الإجمالي
+    const totalCount = await PharmacyRequestForm.countDocuments(filter);
+
+    // تنسيق البيانات
+    const formattedData = orders.map(order => ({
+      orderId: order._id,
+      visitDate: order.visitDate,
+      salesRepName: order.createdBy?.username || 'غير محدد',
+      pharmacyName: order.pharmacy?.customerSystemDescription || order.pharmacy?.name || 'غير محدد',
+      pharmacyAddress: order.pharmacy?.address || '',
+      pharmacyArea: order.pharmacy?.area || 'غير محدد',
+      products: order.orderDetails.map(item => ({
+        productId: item.product?._id,
+        productName: item.product?.PRODUCT || 'غير محدد',
+        productCode: item.product?.CODE || '',
+        productBrand: item.product?.BRAND || 'غير محدد',
+        price: item.product?.PRICE || 0,
+        quantity: item.quantity || 0,
+        totalValue: (item.quantity || 0) * (item.product?.PRICE || 0)
+      })),
+      totalOrderValue: order.orderDetails.reduce((total, item) => {
+        return total + ((item.quantity || 0) * (item.product?.PRICE || 0));
+      }, 0),
+      orderStatus: order.orderStatus,
+      FinalOrderStatusValue: order.FinalOrderStatusValue,
+      createdAt: order.createdAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: 'تم جلب جميع بيانات الطلبات النهائية بنجاح',
+      data: formattedData,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCount / parseInt(limit)),
+        totalRecords: totalCount,
+        limit: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+     console.error('خطأ في جلب جميع بيانات الطلبات النهائية:', error);
+     res.status(500).json({
       success: false,
       message: process.env.NODE_ENV === 'production' ? 'حدث خطأ في الخادم' : error.message
     });
@@ -434,125 +504,7 @@ export const updateRequestStatus = async (req, res) => {
 };
 
 // جلب البيانات المالية لطلبات الصيدليات
-export const getFinancialPharmacyData = async (req, res) => {
-   try {
-     const { adminId } = req.params;
-     const { page = 1, limit = 10, status, startDate, endDate } = req.query;
 
-     // بناء الفلتر
-     const filter = {
-       adminId,
-       hasCollection: true // فقط الطلبات التي تحتوي على تحصيل
-     };
-
-     // فلترة حسب الحالة
-     if (status) {
-       filter.orderStatus = status;
-     }
-
-     // فلترة حسب التاريخ
-     if (startDate || endDate) {
-       filter.visitDate = {};
-       if (startDate) filter.visitDate.$gte = new Date(startDate);
-       if (endDate) filter.visitDate.$lte = new Date(endDate);
-     }
-
-     // حساب إجمالي عدد السجلات
-     const totalRecords = await PharmacyRequestForm.countDocuments(filter);
-
-     // جلب جميع البيانات للإحصائيات
-     const allData = await PharmacyRequestForm.find(filter)
-       .select({
-         collectionDetails: 1
-       })
-       .lean();
-
-     // جلب البيانات مع التصفح
-     const financialData = await PharmacyRequestForm.find(filter)
-       .populate({
-         path: 'createdBy',
-         select: 'firstName lastName email role'
-       })
-       .populate({
-         path: 'pharmacy',
-         select: 'customerSystemDescription area city district'
-       })
-       .select({
-         visitDate: 1,
-         orderDetails: 1,
-         orderStatus: 1,
-         createdBy: 1,
-         pharmacy: 1,
-         createdAt: 1,
-         hasCollection: 1,
-         collectionDetails: 1
-       })
-       .sort({ visitDate: -1 })
-       .skip((page - 1) * limit)
-       .limit(parseInt(limit))
-       .lean();
-
-     // حساب الإحصائيات
-     let totalAmount = 0;
-     let pendingAmount = 0;
-     let approvedAmount = 0;
-     let rejectedAmount = 0;
-
-     allData.forEach(item => {
-       const amount = item.collectionDetails?.amount || 0;
-       const status = item.collectionDetails?.collectionStatus || 'pending';
-       
-       totalAmount += amount;
-       
-       if (status === 'pending') {
-         pendingAmount += amount;
-       } else if (status === 'approved') {
-         approvedAmount += amount;
-       } else if (status === 'rejected') {
-         rejectedAmount += amount;
-       }
-     });
-
-     // تنسيق البيانات للإرجاع
-     const formattedData = financialData.map(item => ({
-       id: item._id,
-       visitDate: item.visitDate,
-       createdAt: item.createdAt,
-       repName: `${item.createdBy?.firstName || ''} ${item.createdBy?.lastName || ''}`.trim(),
-       repEmail: item.createdBy?.email || '',
-       pharmacyName: item.pharmacy?.customerSystemDescription || '',
-       pharmacyArea: item.pharmacy?.area || '',
-       pharmacyCity: item.pharmacy?.city || '',
-       amount: item.collectionDetails?.amount || 0,
-       receiptNumber: item.collectionDetails?.receiptNumber || '',
-       status: item.collectionDetails?.collectionStatus || 'pending',
-       receiptImage: item.collectionDetails?.receiptImage || ''
-     }));
-
-     res.status(200).json({
-       success: true,
-       message: 'تم جلب البيانات المالية بنجاح',
-       data: formattedData,
-       pagination: {
-         currentPage: parseInt(page),
-         totalPages: Math.ceil(totalRecords / limit),
-         totalRecords,
-         limit: parseInt(limit)
-       },
-       statistics: {
-         totalAmount,
-         pendingAmount,
-         approvedAmount,
-         rejectedAmount,
-         totalRecords
-       }
-     });
-
-   } catch (err) {
-     console.error('Financial data error:', err);
-     res.status(500).json({ success: false, message: err.message });
-   }
-};
 
 // إحصائيات طلبات الصيدليات
 export const getPharmacyRequestStats = async (req, res) => {
@@ -608,3 +560,81 @@ export const getPharmacyRequestStats = async (req, res) => {
     });
   }
 };
+
+// جلب بيانات مندوب المبيعات للطلبات النهائية
+export const getSalesRepFinalOrders = async (req, res) => {
+  try {
+    const { salesRepId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    // التحقق من صحة معرف مندوب المبيعات
+    if (!mongoose.Types.ObjectId.isValid(salesRepId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'معرف مندوب المبيعات غير صحيح'
+      });
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // البحث عن الطلبات التي FinalOrderStatus = true للمندوب المحدد
+    const orders = await PharmacyRequestForm.find({
+      createdBy: salesRepId,
+      FinalOrderStatus: true
+    })
+    .populate('pharmacy', 'customerSystemDescription name address area')
+    .populate('orderDetails.product', 'PRODUCT CODE PRICE BRAND')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+
+    // حساب العدد الإجمالي
+    const totalCount = await PharmacyRequestForm.countDocuments({
+      createdBy: salesRepId,
+      FinalOrderStatus: true
+    });
+
+    // تنسيق البيانات
+    const formattedData = orders.map(order => ({
+      orderId: order._id,
+      visitDate: order.visitDate,
+      pharmacyName: order.pharmacy?.customerSystemDescription || order.pharmacy?.name || 'غير محدد',
+      pharmacyAddress: order.pharmacy?.address || '',
+      pharmacyArea: order.pharmacy?.area || 'غير محدد',
+      products: order.orderDetails.map(item => ({
+        productId: item.product?._id,
+        productName: item.product?.PRODUCT || 'غير محدد',
+        productCode: item.product?.CODE || '',
+        productBrand: item.product?.BRAND || 'غير محدد',
+        price: item.product?.PRICE || 0,
+        quantity: item.quantity || 0,
+        totalValue: (item.quantity || 0) * (item.product?.PRICE || 0)
+      })),
+      totalOrderValue: order.orderDetails.reduce((total, item) => {
+        return total + ((item.quantity || 0) * (item.product?.PRICE || 0));
+      }, 0),
+      orderStatus: order.orderStatus,
+      FinalOrderStatusValue: order.FinalOrderStatusValue,
+      createdAt: order.createdAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: 'تم جلب بيانات الطلبات النهائية بنجاح',
+      data: formattedData,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCount / parseInt(limit)),
+        totalRecords: totalCount,
+        limit: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+     console.error('خطأ في جلب بيانات الطلبات النهائية:', error);
+     res.status(500).json({
+       success: false,
+       message: process.env.NODE_ENV === 'production' ? 'حدث خطأ في الخادم' : error.message
+     });
+   }
+ };
