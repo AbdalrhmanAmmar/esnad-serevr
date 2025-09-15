@@ -2,7 +2,8 @@ import express from 'express';
 import {
   getOrdersWithFinalStatus,
 
-  exportFinalOrdersToExcel
+  exportFinalOrdersToExcel,
+  updateFinalOrder
 } from '../controllers/OrderCollectorController.js';
 import { isAuthenticated } from '../middleware/auth.js';
 
@@ -18,7 +19,7 @@ router.get('/final-orders', isAuthenticated, getOrdersWithFinalStatus);
 // router.get('/final-orders-stats', isAuthenticated, getFinalOrdersStats);
 
 // تعديل الطلبية النهائية (الحالة والكميات)
-// router.put('/final-orders/:id', isAuthenticated, updateFinalOrder);
+router.put('/final-orders/:id', isAuthenticated, updateFinalOrder);
 
 // تصدير الطلبات النهائية إلى Excel
 router.get('/final-orders/export', isAuthenticated, exportFinalOrdersToExcel);

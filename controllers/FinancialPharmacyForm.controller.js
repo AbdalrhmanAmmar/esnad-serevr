@@ -351,7 +351,7 @@ export const getSalesRepProductsData = async (req, res) => {
 
     // بناء الفلتر الأساسي
     const filter = {
-      adminId,
+      adminId: new mongoose.Types.ObjectId(adminId),
       hasOrder: true, // فقط الطلبات التي تحتوي على طلبية
       orderDetails: { $exists: true, $ne: [] } // فقط الطلبات التي تحتوي على تفاصيل الطلب
     };
@@ -363,7 +363,7 @@ export const getSalesRepProductsData = async (req, res) => {
 
     // فلترة حسب مندوب المبيعات
     if (salesRepId) {
-      filter.createdBy = salesRepId;
+      filter.createdBy = new mongoose.Types.ObjectId(salesRepId);
     }
 
     // فلترة حسب التاريخ
@@ -493,40 +493,54 @@ export const getSalesRepProductsData = async (req, res) => {
     stats.uniqueProductsCount = stats.uniqueProducts.size;
     delete stats.uniqueProducts;
 
-    // تنسيق البيانات للاستجابة
+    // تنسيق البيانات للاستجابة - تجميع المنتجات في طلب واحد
     const formattedData = [];
     
     salesData.forEach(order => {
       if (order.orderDetails && order.orderDetails.length > 0) {
-        order.orderDetails.forEach(detail => {
-          // فلترة حسب المنتج إذا تم تحديده
-          if (productId && detail.product?._id?.toString() !== productId) {
-            return;
-          }
+        // فلترة المنتجات حسب productId إذا تم تحديده
+        let filteredOrderDetails = order.orderDetails;
+        if (productId) {
+          filteredOrderDetails = order.orderDetails.filter(detail => 
+            detail.product?._id?.toString() === productId
+          );
+        }
 
-          formattedData.push({
-            id: `${order._id}_${detail.product?._id}`,
-            orderId: order._id,
-            visitDate: order.visitDate,
-            createdAt: order.createdAt,
-            salesRepName: order.createdBy
-              ? `${order.createdBy.firstName || ''} ${order.createdBy.lastName || ''}`.trim() || 'غير محدد'
-              : 'غير محدد',
-            salesRepEmail: order.createdBy?.email || '',
-            pharmacyName: order.pharmacy?.customerSystemDescription || 'غير محدد',
-            pharmacyArea: order.pharmacy?.area || '',
-            pharmacyCity: order.pharmacy?.city || '',
+        // إذا لم تبق منتجات بعد الفلترة، تخطي هذا الطلب
+        if (filteredOrderDetails.length === 0) {
+          return;
+        }
+
+        // حساب القيمة الإجمالية للطلب
+        const totalOrderValue = filteredOrderDetails.reduce((sum, detail) => {
+          return sum + ((detail.quantity || 0) * (detail.product?.PRICE || 0));
+        }, 0);
+
+        formattedData.push({
+          id: order._id,
+          orderId: order._id,
+          visitDate: order.visitDate,
+          createdAt: order.createdAt,
+          salesRepName: order.createdBy
+            ? `${order.createdBy.firstName || ''} ${order.createdBy.lastName || ''}`.trim() || 'غير محدد'
+            : 'غير محدد',
+          salesRepEmail: order.createdBy?.email || '',
+          pharmacyName: order.pharmacy?.customerSystemDescription || 'غير محدد',
+          pharmacyArea: order.pharmacy?.area || '',
+          pharmacyCity: order.pharmacy?.city || '',
+          products: filteredOrderDetails.map(detail => ({
             productId: detail.product?._id || '',
             productName: detail.product?.PRODUCT || 'غير محدد',
             productCode: detail.product?.CODE || '',
             productBrand: detail.product?.BRAND || '',
             productPrice: detail.product?.PRICE || 0,
             quantity: detail.quantity || 0,
-            totalValue: (detail.quantity || 0) * (detail.product?.PRICE || 0),
-            orderStatus: order.orderStatus || 'pending',
-            FinalOrderStatus: order.FinalOrderStatus || false,
-            FinalOrderStatusValue: order.FinalOrderStatusValue || null
-          });
+            totalValue: (detail.quantity || 0) * (detail.product?.PRICE || 0)
+          })),
+          totalOrderValue: totalOrderValue,
+          orderStatus: order.orderStatus || 'pending',
+          FinalOrderStatus: order.FinalOrderStatus || false,
+          FinalOrderStatusValue: order.FinalOrderStatusValue || null
         });
       }
     });
@@ -957,7 +971,7 @@ export const exportSalesRepProductsData = async (req, res) => {
 
     // بناء الفلتر الأساسي
     const filter = {
-      adminId,
+      adminId: new mongoose.Types.ObjectId(adminId),
       orderDetails: { $exists: true, $ne: [] }
     };
 
@@ -968,7 +982,7 @@ export const exportSalesRepProductsData = async (req, res) => {
 
     // فلترة حسب مندوب المبيعات
     if (salesRepId) {
-      filter.createdBy = salesRepId;
+      filter.createdBy = new mongoose.Types.ObjectId(salesRepId);
     }
 
     // فلترة حسب التاريخ
