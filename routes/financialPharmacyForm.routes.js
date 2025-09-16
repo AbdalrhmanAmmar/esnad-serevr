@@ -41,7 +41,7 @@ router.get('/export',
 // جلب بيانات المنتجات الخاصة بمندوبي المبيعات
 router.get('/:adminId/sales-products', 
   isAuthenticated, 
-  // checkRole(['admin', 'superAdmin']), 
+  checkRole(['ADMIN', 'superAdmin']), 
   getSalesRepProductsData
 );
 

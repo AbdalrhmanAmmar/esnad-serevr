@@ -1,0 +1,32 @@
+### تجربة البحث عن تفاصيل الدكتور
+GET http://localhost:4000/api/automation/doctor-details?doctorName=أحمد
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+###
+
+### تجربة الإحصائيات السريعة للدكتور
+GET http://localhost:4000/api/automation/doctor-stats?doctorName=محمد
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+###
+
+### تجربة البحث المتقدم للأطباء
+GET http://localhost:4000/api/automation/search-doctors?query=أحمد&specialty=باطنة&limit=5
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+###
+
+### البحث بالمدينة والمنطقة
+GET http://localhost:4000/api/automation/search-doctors?city=طرابلس&area=الدهماني
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+###
+
+### البحث العام للأطباء
+GET http://localhost:4000/api/automation/search-doctors?query=د
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json

@@ -19,6 +19,7 @@ import salesRepRoutes from "./routes/salesRep.routes.js";
 import financialPharmacyFormRoutes from "./routes/financialPharmacyForm.routes.js";
 import areaAnalyticsRoutes from "./routes/areaAnalytics.routes.js";
 import orderCollectorRoutes from "./routes/orderCollector.routes.js";
+import automationRoutes from "./routes/automation.routes.js";
 import cors from "cors";
 
 
@@ -64,6 +65,7 @@ app.use("/api/sales-rep", salesRepRoutes);
 app.use("/api/financial-pharmacy", financialPharmacyFormRoutes);
 app.use("/api/area-analytics", areaAnalyticsRoutes);
 app.use("/api/order-collector", orderCollectorRoutes);
+app.use("/api/automation", automationRoutes);
 
 const PORT = process.env.PORT || 4000;
 

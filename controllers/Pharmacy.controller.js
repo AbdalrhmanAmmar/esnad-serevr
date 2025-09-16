@@ -305,7 +305,6 @@ const exportPharmaciesExcel = async (req, res) => {
             'المدينة': pharmacy.city,
             'الحي': pharmacy.district,
             'اسم المسؤول': pharmacy.adminId ? `${pharmacy.adminId.firstName} ${pharmacy.adminId.lastName}` : 'غير محدد',
-            'إيميل المسؤول': pharmacy.adminId ? pharmacy.adminId.email : 'غير محدد',
             'تاريخ الإنشاء': new Date(pharmacy.createdAt).toLocaleDateString('ar-EG'),
             'تاريخ التحديث': new Date(pharmacy.updatedAt).toLocaleDateString('ar-EG')
         }));
