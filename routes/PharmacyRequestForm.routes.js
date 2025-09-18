@@ -96,7 +96,7 @@ router.get('/user/my-requests',
 // جلب الطلبات النهائية لمندوب المبيعات
 // GET /api/pharmacy-requests/sales-rep/:salesRepId/final-orders
 router.get('/sales-rep/:salesRepId/final-orders',
-  checkRole(['SALES REP']),
+  isAuthenticated,
   getSalesRepFinalOrders
 );
 
