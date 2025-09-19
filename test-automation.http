@@ -30,3 +30,17 @@ Content-Type: application/json
 GET http://localhost:4000/api/automation/search-doctors?query=د
 Authorization: Bearer YOUR_TOKEN_HERE
 Content-Type: application/json
+
+###
+
+### 🔍 البحث الشامل بكود المنتج
+GET http://localhost:4000/api/automation/product-search?productCode=ABC123
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+###
+
+### البحث بكود منتج آخر
+GET http://localhost:4000/api/automation/product-search?productCode=PANADOL
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 البحث بكود المنتج - نظام إسناد</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
+        
+        * {
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .result-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .status-approved {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .status-pending {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        
+        .status-rejected {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <div class="gradient-bg text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="text-center">
+                <h1 class="text-4xl font-bold mb-2">
+                    <i class="fas fa-search mr-3"></i>
+                    نظام البحث بكود المنتج
+                </h1>
+                <p class="text-xl opacity-90">ابحث عن جميع المعلومات المتعلقة بالمنتج في النظام</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-xl p-8 card-hover">
+                <div class="text-center mb-6">
+                    <i class="fas fa-pills text-6xl text-blue-500 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-800">أدخل كود المنتج</h2>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-barcode mr-2"></i>
+                            كود المنتج
+                        </label>
+                        <input type="text" id="productCode" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                               placeholder="مثال: PANADOL, ABC123">
+                    </div>
+                    
+                    <button onclick="searchProduct()" 
+                            class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105">
+                        <i class="fas fa-search mr-2"></i>
+                        بحث
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="loading text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <p class="mt-4 text-gray-600">جاري البحث...</p>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results" class="container mx-auto px-4 pb-8" style="display: none;">
+        <!-- Product Info -->
+        <div id="productInfo" class="max-w-4xl mx-auto mb-8"></div>
+        
+        <!-- Summary Stats -->
+        <div id="summaryStats" class="max-w-6xl mx-auto mb-8"></div>
+        
+        <!-- Results Tabs -->
+        <div class="max-w-6xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <!-- Tab Headers -->
+                <div class="flex flex-wrap border-b border-gray-200 bg-gray-50">
+                    <button onclick="showTab('visits')" class="tab-btn px-6 py-4 font-semibold text-blue-600 border-b-2 border-blue-600">
+                        <i class="fas fa-user-md mr-2"></i>
+                        زيارات الأطباء
+                        <span id="visitsCount" class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm mr-2">0</span>
+                    </button>
+                    <button onclick="showTab('requests')" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
+                        <i class="fas fa-file-alt mr-2"></i>
+                        طلبات بسيطة
+                        <span id="requestsCount" class="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm mr-2">0</span>
+                    </button>
+                    <button onclick="showTab('marketing')" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
+                        <i class="fas fa-bullhorn mr-2"></i>
+                        أنشطة تسويقية
+                        <span id="marketingCount" class="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm mr-2">0</span>
+                    </button>
+                    <button onclick="showTab('pharmacy')" class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600">
+                        <i class="fas fa-store mr-2"></i>
+                        زيارات الصيدليات
+                        <span id="pharmacyCount" class="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm mr-2">0</span>
+                    </button>
+                </div>
+                
+                <!-- Tab Content -->
+                <div id="tabContent" class="p-6">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    <div id="errorMessage" class="max-w-2xl mx-auto px-4" style="display: none;">
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <span id="errorText"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let currentTab = 'visits';
+
+        async function searchProduct() {
+            const productCode = document.getElementById('productCode').value.trim();
+            
+            if (!productCode) {
+                showError('يرجى إدخال كود المنتج');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+            hideResults();
+
+            try {
+                const response = await fetch(`/api/automation/product-search?productCode=${encodeURIComponent(productCode)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                        // Note: Authentication removed for testing
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentData = data.data;
+                    displayResults(data.data);
+                } else {
+                    showError(data.message || 'حدث خطأ في البحث');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('حدث خطأ في الاتصال بالخادم');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayResults(data) {
+            displayProductInfo(data.productInfo);
+            displaySummaryStats(data.summary);
+            updateTabCounts(data);
+            showTab(currentTab);
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function displayProductInfo(product) {
+            const html = `
+                <div class="bg-white rounded-2xl shadow-xl p-8 result-card card-hover">
+                    <div class="text-center">
+                        <div class="w-20 h-20 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-pills text-3xl text-white"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">${product.name}</h2>
+                        <div class="flex justify-center space-x-4 text-sm text-gray-600">
+                            <span><i class="fas fa-barcode mr-1"></i> ${product.code}</span>
+                            <span><i class="fas fa-tag mr-1"></i> ${product.category}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('productInfo').innerHTML = html;
+        }
+
+        function displaySummaryStats(summary) {
+            const html = `
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl shadow-lg p-6 text-center card-hover">
+                        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-user-md text-2xl text-blue-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-800">${summary.totalDoctorVisits}</div>
+                        <div class="text-sm text-gray-600">زيارات الأطباء</div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-6 text-center card-hover">
+                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-file-alt text-2xl text-green-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-800">${summary.totalSimpleRequests}</div>
+                        <div class="text-sm text-gray-600">طلبات بسيطة</div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-6 text-center card-hover">
+                        <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-bullhorn text-2xl text-purple-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-800">${summary.totalMarketingRequests}</div>
+                        <div class="text-sm text-gray-600">أنشطة تسويقية</div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-6 text-center card-hover">
+                        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="fas fa-store text-2xl text-orange-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-gray-800">${summary.totalPharmacyRequests}</div>
+                        <div class="text-sm text-gray-600">زيارات الصيدليات</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('summaryStats').innerHTML = html;
+        }
+
+        function updateTabCounts(data) {
+            document.getElementById('visitsCount').textContent = data.visitDoctorForms.length;
+            document.getElementById('requestsCount').textContent = data.simpleFormRequests.length;
+            document.getElementById('marketingCount').textContent = data.marketingActivityRequests.length;
+            document.getElementById('pharmacyCount').textContent = data.pharmacyVisitRequests.length;
+        }
+
+        function showTab(tabName) {
+            currentTab = tabName;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = 'tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600';
+            });
+            event.target.className = 'tab-btn px-6 py-4 font-semibold text-blue-600 border-b-2 border-blue-600';
+            
+            // Show content
+            let content = '';
+            switch(tabName) {
+                case 'visits':
+                    content = generateVisitsContent(currentData.visitDoctorForms);
+                    break;
+                case 'requests':
+                    content = generateRequestsContent(currentData.simpleFormRequests);
+                    break;
+                case 'marketing':
+                    content = generateMarketingContent(currentData.marketingActivityRequests);
+                    break;
+                case 'pharmacy':
+                    content = generatePharmacyContent(currentData.pharmacyVisitRequests);
+                    break;
+            }
+            
+            document.getElementById('tabContent').innerHTML = content;
+        }
+
+        function generateVisitsContent(visits) {
+            if (visits.length === 0) {
+                return '<div class="text-center py-8 text-gray-500"><i class="fas fa-inbox text-4xl mb-4"></i><p>لا توجد زيارات للأطباء</p></div>';
+            }
+            
+            return visits.map(visit => `
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-4 border border-blue-200 card-hover">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800 mb-2">
+                                <i class="fas fa-user-md text-blue-600 mr-2"></i>
+                                ${visit.doctor.name}
+                            </h3>
+                            <div class="space-y-1 text-sm text-gray-600">
+                                <p><i class="fas fa-stethoscope mr-2"></i> ${visit.doctor.specialty}</p>
+                                <p><i class="fas fa-map-marker-alt mr-2"></i> ${visit.doctor.city} - ${visit.doctor.area}</p>
+                                <p><i class="fas fa-building mr-2"></i> ${visit.doctor.brand}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-800 mb-2">
+                                <i class="fas fa-user-tie text-green-600 mr-2"></i>
+                                ${visit.medicalRep.name}
+                            </h4>
+                            <div class="space-y-1 text-sm text-gray-600">
+                                <p><i class="fas fa-calendar mr-2"></i> ${new Date(visit.visitDate).toLocaleDateString('ar-SA')}</p>
+                                <p><i class="fas fa-pills mr-2"></i> العينات: ${visit.product.samplesCount}</p>
+                                <p><i class="fas fa-info-circle mr-2"></i> ${visit.status}</p>
+                            </div>
+                        </div>
+                    </div>
+                    ${visit.notes ? `<div class="mt-4 p-3 bg-white rounded-lg"><i class="fas fa-sticky-note text-yellow-600 mr-2"></i>${visit.notes}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function generateRequestsContent(requests) {
+            if (requests.length === 0) {
+                return '<div class="text-center py-8 text-gray-500"><i class="fas fa-inbox text-4xl mb-4"></i><p>لا توجد طلبات بسيطة</p></div>';
+            }
+            
+            return requests.map(request => `
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-4 border border-green-200 card-hover">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">
+                                <i class="fas fa-user-md text-green-600 mr-2"></i>
+                                ${request.doctor.name}
+                            </h3>
+                            <p class="text-sm text-gray-600">${request.doctor.specialty} - ${request.doctor.city}</p>
+                        </div>
+                        <div class="text-left">
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold ${
+                                request.status === 'مقبول' ? 'bg-green-100 text-green-800' :
+                                request.status === 'مرفوض' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }">
+                                ${request.status}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <p class="text-gray-600"><i class="fas fa-user-tie mr-2"></i> ${request.medicalRep.name}</p>
+                            <p class="text-gray-600"><i class="fas fa-calendar mr-2"></i> ${new Date(request.requestDate).toLocaleDateString('ar-SA')}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600"><i class="fas fa-truck mr-2"></i> ${request.deliveryDate ? new Date(request.deliveryDate).toLocaleDateString('ar-SA') : 'غير محدد'}</p>
+                            <p class="text-gray-600"><i class="fas fa-sort-numeric-up mr-2"></i> الكمية: ${request.product.quantity}</p>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-800"><i class="fas fa-pills mr-2"></i> ${request.product.name}</p>
+                        </div>
+                    </div>
+                    ${request.notes ? `<div class="mt-4 p-3 bg-white rounded-lg"><i class="fas fa-sticky-note text-yellow-600 mr-2"></i>${request.notes}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function generateMarketingContent(marketing) {
+            if (marketing.length === 0) {
+                return '<div class="text-center py-8 text-gray-500"><i class="fas fa-inbox text-4xl mb-4"></i><p>لا توجد أنشطة تسويقية</p></div>';
+            }
+            
+            return marketing.map(activity => `
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-4 border border-purple-200 card-hover">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">
+                                <i class="fas fa-bullhorn text-purple-600 mr-2"></i>
+                                ${activity.activityType.arabic}
+                            </h3>
+                            <p class="text-sm text-gray-600">${activity.activityType.english}</p>
+                        </div>
+                        <div class="text-left">
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold ${
+                                activity.status === 'مقبول' ? 'bg-green-100 text-green-800' :
+                                activity.status === 'مرفوض' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }">
+                                ${activity.status}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-semibold text-gray-800 mb-2">
+                                <i class="fas fa-user-md text-blue-600 mr-2"></i>
+                                ${activity.doctor.name}
+                            </h4>
+                            <p class="text-sm text-gray-600">${activity.doctor.specialty} - ${activity.doctor.city}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-800 mb-2">
+                                <i class="fas fa-user-tie text-green-600 mr-2"></i>
+                                ${activity.medicalRep.name}
+                            </h4>
+                            <div class="text-sm text-gray-600">
+                                <p><i class="fas fa-calendar mr-2"></i> ${new Date(activity.activityDate).toLocaleDateString('ar-SA')}</p>
+                                <p><i class="fas fa-dollar-sign mr-2"></i> التكلفة: ${activity.cost}</p>
+                            </div>
+                        </div>
+                    </div>
+                    ${activity.notes ? `<div class="mt-4 p-3 bg-white rounded-lg"><i class="fas fa-sticky-note text-yellow-600 mr-2"></i>${activity.notes}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function generatePharmacyContent(pharmacy) {
+            if (pharmacy.length === 0) {
+                return '<div class="text-center py-8 text-gray-500"><i class="fas fa-inbox text-4xl mb-4"></i><p>لا توجد زيارات للصيدليات</p></div>';
+            }
+            
+            return pharmacy.map(visit => `
+                <div class="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-6 mb-4 border border-orange-200 card-hover">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">
+                                <i class="fas fa-store text-orange-600 mr-2"></i>
+                                ${visit.pharmacy.name}
+                            </h3>
+                            <p class="text-sm text-gray-600">${visit.pharmacy.city} - ${visit.pharmacy.area}</p>
+                        </div>
+                        <div class="text-left space-y-1">
+                            <span class="block px-3 py-1 rounded-full text-sm font-semibold ${
+                                visit.orderStatus === 'مقبول' ? 'bg-green-100 text-green-800' :
+                                visit.orderStatus === 'مرفوض' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }">
+                                ${visit.orderStatus}
+                            </span>
+                            <span class="block px-3 py-1 rounded-full text-xs font-semibold ${
+                                visit.finalOrderStatus.includes('مقبول') ? 'bg-green-100 text-green-800' :
+                                visit.finalOrderStatus.includes('مرفوض') ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                            }">
+                                ${visit.finalOrderStatus}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <p class="text-gray-600"><i class="fas fa-user-tie mr-2"></i> ${visit.medicalRep.name}</p>
+                            <p class="text-gray-600"><i class="fas fa-calendar mr-2"></i> ${new Date(visit.visitDate).toLocaleDateString('ar-SA')}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600"><i class="fas fa-pills mr-2"></i> ${visit.product.name}</p>
+                            <p class="text-gray-600"><i class="fas fa-sort-numeric-up mr-2"></i> الكمية: ${visit.product.quantity}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600"><i class="fas fa-phone mr-2"></i> ${visit.pharmacy.phone}</p>
+                            ${visit.hasCollection ? `<p class="text-green-600"><i class="fas fa-money-bill mr-2"></i> تحصيل: ${visit.collectionAmount}</p>` : ''}
+                        </div>
+                    </div>
+                    ${visit.notes ? `<div class="mt-4 p-3 bg-white rounded-lg"><i class="fas fa-sticky-note text-yellow-600 mr-2"></i>${visit.notes}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.add('active');
+            } else {
+                loading.classList.remove('active');
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function hideResults() {
+            document.getElementById('results').style.display = 'none';
+        }
+
+        // Allow Enter key to trigger search
+        document.getElementById('productCode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchProduct();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -2,7 +2,8 @@ import express from 'express';
 import { 
   getDoctorDetails, 
   getDoctorQuickStats, 
-  searchDoctorsAdvanced 
+  searchDoctorsAdvanced,
+  searchByProductCode 
 } from '../controllers/automation.controller.js';
 import { isAuthenticated } from '../middleware/auth.js';
 
@@ -19,5 +20,9 @@ router.get('/doctor-stats', isAuthenticated, getDoctorQuickStats);
 // 🔍 البحث المتقدم للأطباء
 // GET /api/automation/search-doctors?query=البحث&specialty=التخصص&city=المدينة&area=المنطقة&limit=10
 router.get('/search-doctors', isAuthenticated, searchDoctorsAdvanced);
+
+// 🔍 البحث الشامل بكود المنتج
+// GET /api/automation/product-search?productCode=ABC123
+router.get('/product-search', isAuthenticated, searchByProductCode);
 
 export default router;
