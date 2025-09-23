@@ -186,7 +186,6 @@ export const updateUser = async (req, res) => {
       isActive
     } = req.body;
 
-    // التحقق من وجود المستخدم
     const existingUser = await UserModel.findById(id);
     if (!existingUser) {
       return res.status(404).json({
@@ -195,7 +194,6 @@ export const updateUser = async (req, res) => {
       });
     }
 
-    // بناء كائن التحديث (استبعاد كلمة المرور)
     const updateData = {};
 
     if (firstName !== undefined) updateData.firstName = firstName.trim();
@@ -225,7 +223,6 @@ export const updateUser = async (req, res) => {
     }
 
     if (username !== undefined) {
-      // التحقق من تفرد اسم المستخدم (إذا تم تغييره)
       const normalizedUsername = username.toLowerCase().trim();
       if (normalizedUsername !== existingUser.username) {
         const usernameExists = await UserModel.findOne({
@@ -253,7 +250,6 @@ export const updateUser = async (req, res) => {
     if (district !== undefined) updateData.district = district?.trim();
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
-    // التحقق من وجود المشرف إذا تم تحديده
     if (supervisor !== undefined) {
       if (supervisor) {
         const supervisorExists = await UserModel.findOne({
@@ -272,7 +268,6 @@ export const updateUser = async (req, res) => {
       updateData.supervisor = supervisor || null;
     }
 
-    // تحديث المستخدم
     const updatedUser = await UserModel.findByIdAndUpdate(
       id,
       updateData,
@@ -522,7 +517,6 @@ export const getAllUsersByAdmin = async (req, res) => {
     // حساب التصفح
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // جلب المستخدمين مع populate للمشرف
     const users = await UserModel.find(filter)
       .populate('supervisor', 'username firstName lastName role')
       .select('-password')

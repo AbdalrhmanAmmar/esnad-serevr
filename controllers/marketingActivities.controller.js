@@ -128,7 +128,7 @@ export const getAllMarketingActivities = async (req, res) => {
         }
       }
     });
-
+ns
   } catch (err) {
     console.error('❌ Error fetching marketing activities:', err.message);
     return res.status(500).json({
