@@ -102,7 +102,7 @@ router.get('/sales-rep/:salesRepId/final-orders',
 
 // Route للأدمن لجلب جميع الطلبات النهائية لجميع مندوبي المبيعات
 router.get('/admin/all-final-orders', 
-  checkRole(['ADMIN', 'SALES SUPERVISOR' , 'FINANCIAL OFFICER']), 
+  checkRole(['ADMIN', 'SALES SUPERVISOR' , 'FINANCIAL OFFICER','FINANCIAL MANAGER' ,'ASSITANT']), 
   getAllSalesRepFinalOrders
 );
 
