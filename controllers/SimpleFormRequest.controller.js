@@ -761,6 +761,200 @@ const getSampleRequestsByAdminId = async (req, res) => {
     }
 };
 
+// الحصول على طلبات العينات حسب معرف المستخدم
+const getSampleRequestsByUserId = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { 
+            page = 1, 
+            limit = 10, 
+            status, 
+            doctor, 
+            product,
+            startDate,
+            endDate,
+            search 
+        } = req.query;
+        
+        const skip = (page - 1) * limit;
+
+        // التحقق من صحة معرف المستخدم
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'معرف المستخدم مطلوب'
+            });
+        }
+
+        // التحقق من وجود المستخدم
+        const user = await UserModel.findById(userId).select('firstName lastName username role');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'المستخدم غير موجود'
+            });
+        }
+
+        // بناء الفلتر الأساسي حسب المستخدم
+        let filter = {};
+        
+        // تحديد الفلتر بناءً على دور المستخدم
+        if (user.role === 'MEDICAL REP') {
+            // إذا كان المستخدم مندوب طبي، نجلب طلباته فقط
+            filter.medicalRep = userId;
+        } else if (user.role === 'ADMIN') {
+            // إذا كان المستخدم أدمن، نجلب طلبات الـ adminId الخاص به
+            filter.adminId = userId;
+        } else if (user.role === 'SUPERVISOR') {
+            // إذا كان المستخدم مشرف، نجلب طلبات المندوبين التابعين له
+            const medicalReps = await UserModel.find({ 
+                supervisor: userId, 
+                role: 'MEDICAL REP' 
+            }).select('_id');
+            
+            const medicalRepIds = medicalReps.map(rep => rep._id);
+            filter.medicalRep = { $in: medicalRepIds };
+        } else {
+            // لأي دور آخر، نرجع رسالة خطأ
+            return res.status(403).json({
+                success: false,
+                message: 'الدور غير مدعوم لهذه العملية'
+            });
+        }
+        
+        // فلترة حسب الحالة
+        if (status) {
+            filter.status = status;
+        }
+        
+        // فلترة حسب الدكتور
+        if (doctor) {
+            filter.doctor = doctor;
+        }
+        
+        // فلترة حسب المنتج
+        if (product) {
+            filter.product = product;
+        }
+        
+        // فلترة حسب التاريخ
+        if (startDate || endDate) {
+            filter.requestDate = {};
+            if (startDate) {
+                filter.requestDate.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                filter.requestDate.$lte = new Date(endDate);
+            }
+        }
+
+        // البحث النصي
+        if (search) {
+            filter.$or = [
+                { notes: { $regex: search, $options: 'i' } },
+                { 'product.PRODUCT': { $regex: search, $options: 'i' } },
+                { 'doctor.drName': { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const requests = await SimpleFormRequest.find(filter)
+            .populate([
+                { 
+                    path: 'product', 
+                    select: 'PRODUCT CODE BRAND PRICE COMPANY',
+                    match: product ? { _id: product } : {} 
+                },
+                { 
+                    path: 'doctor', 
+                    select: 'drName organizationName specialty telNumber city area district',
+                    match: doctor ? { _id: doctor } : {} 
+                },
+                { 
+                    path: 'medicalRep', 
+                    select: 'firstName lastName username email role' 
+                },
+                { 
+                    path: 'adminId', 
+                    select: 'firstName lastName email' 
+                }
+            ])
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        // إزالة الطلبات التي لا تحتوي على منتج أو دكتور (في حالة الفلترة)
+        const filteredRequests = requests.filter(request => 
+            request.product && request.doctor
+        );
+
+        const total = await SimpleFormRequest.countDocuments(filter);
+        const totalPages = Math.ceil(total / limit);
+
+        // إحصائيات سريعة
+        const stats = await SimpleFormRequest.aggregate([
+            { $match: filter },
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const statusStats = {
+            pending: 0,
+            approved: 0,
+            cancelled: 0,
+            total: total
+        };
+        
+        stats.forEach(stat => {
+            statusStats[stat._id] = stat.count;
+        });
+
+        // إحصائيات إضافية حسب الدور
+        let additionalStats = {};
+        
+        if (user.role === 'SUPERVISOR') {
+            const medicalRepsCount = await UserModel.countDocuments({ 
+                supervisor: userId, 
+                role: 'MEDICAL REP' 
+            });
+            additionalStats.medicalRepsCount = medicalRepsCount;
+        }
+
+        res.json({
+            success: true,
+            message: `تم جلب طلبات العينات للمستخدم ${user.username} بنجاح`,
+            userInfo: {
+                id: user._id,
+                name: `${user.firstName} ${user.lastName}`,
+                username: user.username,
+                role: user.role
+            },
+            data: filteredRequests,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalRequests: total,
+                hasNext: page < totalPages,
+                hasPrev: page > 1
+            },
+            stats: {
+                ...statusStats,
+                ...additionalStats
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching sample requests by user ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'خطأ في جلب طلبات العينات',
+            error: error.message
+        });
+    }
+};
+
 export {
     createSampleRequest,
     getSampleRequests,
@@ -770,5 +964,6 @@ export {
     exportSampleRequestsExcel,
     getSupervisorSampleRequests,
     updateSampleRequestBySupervisor,
-    getSampleRequestsByAdminId
+    getSampleRequestsByAdminId,
+    getSampleRequestsByUserId
 };

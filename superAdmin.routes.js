@@ -1,7 +1,7 @@
 import express from "express";
-import { createAdminAccount, createSuperAdmin, getAllAdmin, exportAdminsToExcel, deleteAdmin } from "../controllers/superAdmin.controller.js";
-import { isAuthenticated } from "../middleware/auth.js";
-import { checkRole } from "../middleware/chekRole.js";
+import { createAdminAccount, createSuperAdmin, getAllAdmin, exportAdminsToExcel, deleteAdmin } from "./controllers/superAdmin.controller.js";
+import { isAuthenticated } from "./middleware/auth.js";
+import { checkRole } from "./middleware/chekRole.js";
 
 const router = express.Router();
 

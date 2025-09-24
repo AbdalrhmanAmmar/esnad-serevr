@@ -8,7 +8,8 @@ import {
     exportSampleRequestsExcel,
     getSupervisorSampleRequests,
     updateSampleRequestBySupervisor,
-    getSampleRequestsByAdminId
+    getSampleRequestsByAdminId,
+    getSampleRequestsByUserId
 } from '../controllers/SimpleFormRequest.controller.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { checkRole } from '../middleware/chekRole.js';
@@ -59,6 +60,10 @@ router.get('/admin/:adminId/requests',
 router.get('/:id', 
     checkRole(['ADMIN', 'SYSTEM_ADMIN', 'MANAGER', 'MEDICAL REP']), 
     getSampleRequestById
+);
+router.get('/user/:userId', 
+    checkRole([ 'MEDICAL REP']), 
+    getSampleRequestsByUserId
 );
 
 // تحديث طلب العينة - جميع الأدوار (مع قيود في الكنترولر)
