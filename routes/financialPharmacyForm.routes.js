@@ -38,7 +38,7 @@ router.get('/export',
   isAuthenticated, 
   exportFinancialData
 );
-router.get('/export/sales', 
+router.get('/export/sales/:adminId', 
   isAuthenticated, 
   exportSalesRepProductsData
 );

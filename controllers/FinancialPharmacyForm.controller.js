@@ -1047,7 +1047,6 @@ export const exportSalesRepProductsData = async (req, res) => {
             'اسم المندوب': order.createdBy
               ? `${order.createdBy.firstName || ''} ${order.createdBy.lastName || ''}`.trim() || 'غير محدد'
               : 'غير محدد',
-            'البريد الإلكتروني': order.createdBy?.email || '',
             'اسم الصيدلية': order.pharmacy?.customerSystemDescription || 'غير محدد',
             'المنطقة': order.pharmacy?.area || '',
             'المدينة': order.pharmacy?.city || '',
@@ -1082,7 +1081,6 @@ export const exportSalesRepProductsData = async (req, res) => {
         'الرقم التسلسلي': 'ملخص البيانات',
         'تاريخ الزيارة': '',
         'اسم المندوب': `عدد المندوبين: ${uniqueReps}`,
-        'البريد الإلكتروني': '',
         'اسم الصيدلية': '',
         'المنطقة': '',
         'المدينة': '',
@@ -1110,7 +1108,6 @@ export const exportSalesRepProductsData = async (req, res) => {
       { wch: 12 }, // الرقم التسلسلي
       { wch: 15 }, // تاريخ الزيارة
       { wch: 20 }, // اسم المندوب
-      { wch: 25 }, // البريد الإلكتروني
       { wch: 25 }, // اسم الصيدلية
       { wch: 15 }, // المنطقة
       { wch: 15 }, // المدينة
