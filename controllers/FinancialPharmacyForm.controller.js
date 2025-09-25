@@ -600,7 +600,7 @@ export const exportFinancialData = async (req, res) => {
 
     // إضافة فلترة حسب الحالة إذا وجدت
     if (status) {
-      filters.status = status;
+      filters['collectionDetails.collectionStatus'] = status;
     }
 
     // إضافة فلترة التاريخ إذا وجدت
