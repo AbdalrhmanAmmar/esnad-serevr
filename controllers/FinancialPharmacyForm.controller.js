@@ -212,7 +212,16 @@ error: error.message
 export const getFinancialPharmacyDataWithCollection = async (req, res) => {
   try {
     const { adminId } = req.params;
-    const { page = 1, limit = 10, status, startDate, endDate } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      salesRep, 
+      pharmacy, 
+      startDate, 
+      endDate,
+      search 
+    } = req.query;
 
     // إنشاء فلتر أساسي
     const filter = {
@@ -220,62 +229,110 @@ export const getFinancialPharmacyDataWithCollection = async (req, res) => {
       hasCollection: true
     };
 
-     // فلترة حسب حالة التحصيل
-     if (status) {
-       filter['collectionDetails.collectionStatus'] = status;
-     }
+    // فلترة حسب حالة التحصيل
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      filter['collectionDetails.collectionStatus'] = status;
+    }
 
-     // فلترة حسب التاريخ
-     if (startDate || endDate) {
-       filter.visitDate = {};
-       if (startDate) filter.visitDate.$gte = new Date(startDate);
-       if (endDate) filter.visitDate.$lte = new Date(endDate);
-     }
+    // فلتر حسب المندوب
+    if (salesRep) {
+      filter.createdBy = salesRep;
+    }
 
-     // حساب التخطي للصفحات
-     const skip = (parseInt(page) - 1) * parseInt(limit);
+    // فلتر حسب الصيدلية
+    if (pharmacy) {
+      filter.pharmacy = pharmacy;
+    }
 
-     // جلب البيانات مع populate للمندوب والصيدلية
-     const financialData = await PharmacyRequestForm.find(filter)
-       .populate({
-         path: 'createdBy',
-         select: 'firstName lastName email role'
-       })
-       .populate({
-         path: 'pharmacy',
-         select: 'customerSystemDescription area city district'
-       })
-       .select({
-         visitDate: 1,
-         'collectionDetails.amount': 1,
-         'collectionDetails.receiptNumber': 1,
-         'collectionDetails.collectionStatus': 1,
-         'collectionDetails.receiptImage': 1,
-         createdBy: 1,
-         pharmacy: 1,
-         createdAt: 1
-       })
-       .sort({ visitDate: -1 })
-       .skip(skip)
-       .limit(parseInt(limit));
+    // فلترة حسب التاريخ
+    if (startDate || endDate) {
+      filter.visitDate = {};
+      if (startDate) filter.visitDate.$gte = new Date(startDate);
+      if (endDate) filter.visitDate.$lte = new Date(endDate);
+    }
 
-     // حساب العدد الإجمالي
-     const totalCount = await PharmacyRequestForm.countDocuments(filter);
+    // إعداد البحث النصي
+    let searchStage = [];
+    if (search) {
+      searchStage = [
+        {
+          $match: {
+            $or: [
+              { 'createdBy.firstName': { $regex: search, $options: 'i' } },
+              { 'createdBy.lastName': { $regex: search, $options: 'i' } },
+              { 'pharmacy.customerSystemDescription': { $regex: search, $options: 'i' } }
+            ]
+          }
+        }
+      ];
+    }
 
-     // إنشاء فلتر منفصل للإحصائيات (بدون فلترة حسب status)
-     const statsFilter = {
-       adminId,
-       hasCollection: true
-     };
-     if (startDate || endDate) {
-       statsFilter.visitDate = {};
-       if (startDate) statsFilter.visitDate.$gte = new Date(startDate);
-       if (endDate) statsFilter.visitDate.$lte = new Date(endDate);
-     }
+    // حساب التخطي للصفحات
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-     // جلب جميع البيانات للإحصائيات
-     const allStatsData = await PharmacyRequestForm.find(statsFilter)
-       .select('collectionDetails.amount collectionDetails.collectionStatus');
+    // جلب البيانات مع populate للمندوب والصيدلية
+    let query = PharmacyRequestForm.find(filter)
+      .populate({
+        path: 'createdBy',
+        select: 'firstName lastName email role'
+      })
+      .populate({
+        path: 'pharmacy',
+        select: 'customerSystemDescription area city district'
+      })
+      .select({
+        visitDate: 1,
+        'collectionDetails.amount': 1,
+        'collectionDetails.receiptNumber': 1,
+        'collectionDetails.collectionStatus': 1,
+        'collectionDetails.receiptImage': 1,
+        createdBy: 1,
+        pharmacy: 1,
+        createdAt: 1
+      })
+      .sort({ visitDate: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const financialData = await query;
+
+    // تطبيق البحث النصي بعد populate إذا كان موجوداً
+    let filteredData = financialData;
+    if (search) {
+      filteredData = financialData.filter(item => {
+        const repName = `${item.createdBy?.firstName || ''} ${item.createdBy?.lastName || ''}`.toLowerCase();
+        const pharmacyName = item.pharmacy?.customerSystemDescription?.toLowerCase() || '';
+        const searchTerm = search.toLowerCase();
+        
+        return repName.includes(searchTerm) || pharmacyName.includes(searchTerm);
+      });
+    }
+
+    // حساب العدد الإجمالي
+    const totalCount = await PharmacyRequestForm.countDocuments(filter);
+
+    // إنشاء فلتر منفصل للإحصائيات (بدون فلترة حسب status)
+    const statsFilter = {
+      adminId,
+      hasCollection: true
+    };
+    
+    // إضافة فلاتر أخرى للإحصائيات
+    if (salesRep) {
+      statsFilter.createdBy = salesRep;
+    }
+    if (pharmacy) {
+      statsFilter.pharmacy = pharmacy;
+    }
+    if (startDate || endDate) {
+      statsFilter.visitDate = {};
+      if (startDate) statsFilter.visitDate.$gte = new Date(startDate);
+      if (endDate) statsFilter.visitDate.$lte = new Date(endDate);
+    }
+
+    // جلب جميع البيانات للإحصائيات
+    const allStatsData = await PharmacyRequestForm.find(statsFilter)
+      .select('collectionDetails.amount collectionDetails.collectionStatus');
 
      // حساب الإحصائيات باستخدام reduce
      const stats = allStatsData.reduce((acc, item) => {
@@ -303,7 +360,7 @@ export const getFinancialPharmacyDataWithCollection = async (req, res) => {
      });
 
      // تنسيق البيانات للاستجابة
-     const formattedData = financialData.map(item => ({
+     const formattedData = (search ? filteredData : financialData).map(item => ({
        id: item._id,
        visitDate: item.visitDate,
        createdAt: item.createdAt,
