@@ -12,6 +12,9 @@ const router = express.Router();
 // جلب جميع الطلبات التي تحتوي على FinalOrderStatus = true
 router.get('/final-orders', isAuthenticated, getOrdersWithFinalStatus);
 
+// تصدير الطلبات النهائية إلى Excel (يجب أن يكون قبل :id route)
+router.get('/final-orders/export', isAuthenticated, exportFinalOrdersToExcel);
+
 // جلب الطلبات حسب حالة FinalOrderStatusValue
 // router.get('/final-orders/:status', isAuthenticated, getOrdersByFinalStatusValue);
 
@@ -20,8 +23,5 @@ router.get('/final-orders', isAuthenticated, getOrdersWithFinalStatus);
 
 // تعديل الطلبية النهائية (الحالة والكميات)
 router.put('/final-orders/:id', isAuthenticated, updateFinalOrder);
-
-// تصدير الطلبات النهائية إلى Excel
-router.get('/final-orders/export', isAuthenticated, exportFinalOrdersToExcel);
 
 export default router;

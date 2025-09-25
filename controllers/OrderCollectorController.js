@@ -20,7 +20,17 @@ const getOrdersWithFinalStatus = async (req, res) => {
 
     // فلتر حسب الحالة
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
-      filter.FinalOrderStatusValue = status;
+      if (status === 'pending') {
+        // البحث عن الطلبات التي لم يتم تحديد حالتها النهائية بعد (undefined أو null أو 'pending')
+        filter.$or = [
+          { FinalOrderStatusValue: 'pending' },
+          { FinalOrderStatusValue: { $exists: false } },
+          { FinalOrderStatusValue: null },
+          { FinalOrderStatusValue: undefined }
+        ];
+      } else {
+        filter.FinalOrderStatusValue = status;
+      }
     }
 
     // فلتر حسب المندوب
@@ -391,9 +401,19 @@ const exportFinalOrdersToExcel = async (req, res) => {
     // إعداد الفلاتر
     const filter = { FinalOrderStatus: true };
 
-    // فلتر حسب الحالة (بدون validation)
-    if (status) {
-      filter.FinalOrderStatusValue = status;
+    // فلتر حسب الحالة
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      if (status === 'pending') {
+        // البحث عن الطلبات التي لم يتم تحديد حالتها النهائية بعد (undefined أو null أو 'pending')
+        filter.$or = [
+          { FinalOrderStatusValue: 'pending' },
+          { FinalOrderStatusValue: { $exists: false } },
+          { FinalOrderStatusValue: null },
+          { FinalOrderStatusValue: undefined }
+        ];
+      } else {
+        filter.FinalOrderStatusValue = status;
+      }
     }
 
     // فلتر حسب المندوب
@@ -417,6 +437,20 @@ const exportFinalOrdersToExcel = async (req, res) => {
       }
     }
 
+    // إضافة console.log لتتبع الفلاتر
+    console.log('Export Filter:', filter);
+    
+    // التحقق من البيانات الموجودة في قاعدة البيانات
+    const allFinalOrders = await PharmacyRequestForm.find({ FinalOrderStatus: true })
+      .select('FinalOrderStatusValue')
+      .lean();
+    
+    console.log('All final orders count:', allFinalOrders.length);
+    console.log('Status breakdown:', allFinalOrders.reduce((acc, order) => {
+      acc[order.FinalOrderStatusValue] = (acc[order.FinalOrderStatusValue] || 0) + 1;
+      return acc;
+    }, {}));
+    
     // جلب جميع البيانات بدون pagination للتصدير
     const orders = await PharmacyRequestForm.find(filter)
       .select('visitDate orderDetails orderStatus FinalOrderStatus FinalOrderStatusValue createdAt updatedAt')
@@ -424,6 +458,9 @@ const exportFinalOrdersToExcel = async (req, res) => {
       .populate('pharmacy', 'customerSystemDescription')
       .populate('orderDetails.product', 'PRODUCT CODE PRICE')
       .sort({ createdAt: -1 });
+
+    console.log('Found orders count:', orders.length);
+    console.log('Sample order:', orders[0]);
 
     // تطبيق البحث النصي إذا وُجد
     let filteredOrders = orders;
@@ -434,6 +471,14 @@ const exportFinalOrdersToExcel = async (req, res) => {
         const searchTerm = search.toLowerCase();
         return salesRepName.toLowerCase().includes(searchTerm) || 
                pharmacyName.toLowerCase().includes(searchTerm);
+      });
+    }
+
+    // التحقق من وجود بيانات للتصدير
+    if (filteredOrders.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'لا توجد طلبات مطابقة للفلاتر المحددة'
       });
     }
 
@@ -458,20 +503,23 @@ const exportFinalOrdersToExcel = async (req, res) => {
       const pharmacyName = order.pharmacy?.customerSystemDescription || 'غير محدد';
       const visitDate = order.visitDate ? new Date(order.visitDate).toLocaleDateString('ar-EG') : 'غير محدد';
       
-      // إضافة صف لكل منتج في الطلبية
-      order.orderDetails.forEach(item => {
-        exportData.push([
-          visitDate,
-          salesRepName,
-          pharmacyName,
-          item.product?.PRODUCT || 'غير محدد',
-          item.product?.CODE || 'غير محدد',
-          item.quantity || 0,
-          item.product?.PRICE || 0,
-          order.FinalOrderStatusValue === 'approved' ? 'مقبول' : 
-          order.FinalOrderStatusValue === 'rejected' ? 'مرفوض' : 'في الانتظار'
-        ]);
-      });
+      // التأكد من وجود orderDetails قبل المعالجة
+      if (order.orderDetails && order.orderDetails.length > 0) {
+        // إضافة صف لكل منتج في الطلبية
+        order.orderDetails.forEach(item => {
+          exportData.push([
+            visitDate,
+            salesRepName,
+            pharmacyName,
+            item.product?.PRODUCT || 'غير محدد',
+            item.product?.CODE || 'غير محدد',
+            item.quantity || 0,
+            item.product?.PRICE || 0,
+            order.FinalOrderStatusValue === 'approved' ? 'مقبول' : 
+            order.FinalOrderStatusValue === 'rejected' ? 'مرفوض' : 'في الانتظار'
+          ]);
+        });
+      }
     });
 
     // إنشاء ملف Excel

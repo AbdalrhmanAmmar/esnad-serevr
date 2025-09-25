@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getFinancialPharmacyData,
+  getFinancialPharmacyDataWithCollection,
   updateCollectionStatus,
   getCollectionStatsByRep,
   getSalesRepProductsData,
@@ -18,6 +19,12 @@ const router = Router();
 router.get('/admin/:adminId', 
   isAuthenticated, 
   getFinancialPharmacyData
+);
+
+// جلب البيانات المالية مع تفاصيل التحصيل
+router.get('/admin/:adminId/collection', 
+  isAuthenticated, 
+  getFinancialPharmacyDataWithCollection
 );
 
 // تحديث حالة التحصيل
