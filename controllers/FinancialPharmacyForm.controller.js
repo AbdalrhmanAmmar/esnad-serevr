@@ -1,6 +1,6 @@
 import PharmacyRequestForm from '../models/PharmacyRequestForm.model.js';
 import mongoose from 'mongoose';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 
 // جلب البيانات المالية لطلبات الصيدليات
 export const getFinancialPharmacyData = async (req, res) => {
@@ -626,7 +626,7 @@ export const exportFinancialData = async (req, res) => {
       })
       .select({
         visitDate: 1,
-        status: 1,
+        'collectionDetails.collectionStatus': 1,
         'collectionDetails.amount': 1,
         'collectionDetails.receiptNumber': 1,
         createdBy: 1,
@@ -655,9 +655,9 @@ export const exportFinancialData = async (req, res) => {
       'رقم الإيصال': item.collectionDetails?.receiptNumber || '',
       'الحالة': {
         'pending': 'قيد الانتظار',
-        'approved': 'موافق عليه',
+        'approved': 'مقبول',
         'rejected': 'مرفوض'
-      }[item.status] || item.status,
+      }[item.collectionDetails?.collectionStatus] || 'قيد الانتظار',
       'تاريخ الإنشاء': new Date(item.createdAt).toLocaleDateString('ar-EG')
     }));
 
