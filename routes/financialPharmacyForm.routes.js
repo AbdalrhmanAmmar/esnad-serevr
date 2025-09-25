@@ -6,7 +6,8 @@ import {
   getSalesRepProductsData,
   exportFinancialData,
   updateOrderStatus,
-  getOrderStatusHistory
+  getOrderStatusHistory,
+  exportSalesRepProductsData
 } from '../controllers/FinancialPharmacyForm.controller.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { checkRole } from '../middleware/chekRole.js';
@@ -36,6 +37,10 @@ router.get('/stats/reps/:adminId',
 router.get('/export', 
   isAuthenticated, 
   exportFinancialData
+);
+router.get('/export/sales', 
+  isAuthenticated, 
+  exportSalesRepProductsData
 );
 
 // جلب بيانات المنتجات الخاصة بمندوبي المبيعات

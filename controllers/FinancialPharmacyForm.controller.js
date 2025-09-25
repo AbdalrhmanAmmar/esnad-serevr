@@ -972,7 +972,8 @@ export const exportSalesRepProductsData = async (req, res) => {
     // بناء الفلتر الأساسي
     const filter = {
       adminId: new mongoose.Types.ObjectId(adminId),
-      orderDetails: { $exists: true, $ne: [] }
+      hasOrder: true, // فقط الطلبات التي تحتوي على طلبية
+      orderDetails: { $exists: true, $ne: [] } // فقط الطلبات التي تحتوي على تفاصيل الطلب
     };
 
     // فلترة حسب حالة الطلب
