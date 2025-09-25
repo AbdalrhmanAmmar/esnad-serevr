@@ -1,4 +1,5 @@
 import PharmacyRequestForm from '../models/PharmacyRequestForm.model.js';
+import ReceiptBook from '../models/ReceiptBook.model.js';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'path';
@@ -35,7 +36,6 @@ export const upload = multer({
   }
 });
 
-// إنشاء طلب صيدلية جديد
 export const createPharmacyRequestForm = async (req, res) => {
   try {
     const {
@@ -48,6 +48,7 @@ export const createPharmacyRequestForm = async (req, res) => {
       orderDetails,
       hasCollection,
       collectionDetails,
+      receiptNumber,
       additionalNotes
     } = req.body;
 
@@ -57,6 +58,57 @@ export const createPharmacyRequestForm = async (req, res) => {
         success: false,
         message: 'معرف الصيدلية غير صحيح'
       });
+    }
+
+    let receiptBookId = null;
+
+    // التحقق من رقم الوصل إذا تم إدخاله
+    if (receiptNumber) {
+      // البحث عن دفتر الوصلات النشط للمستخدم الحالي
+      const receiptBook = await ReceiptBook.findOne({
+        salesRep: req.user._id || req.user.id,
+        isActive: true,
+        isCompleted: false
+      });
+
+      if (!receiptBook) {
+        return res.status(400).json({
+          success: false,
+          message: 'لا يوجد دفتر وصلات نشط مخصص لك'
+        });
+      }
+
+      // التحقق من أن رقم الوصل ضمن النطاق المسموح
+      if (receiptNumber < receiptBook.startNumber || receiptNumber > receiptBook.endNumber) {
+        return res.status(400).json({
+          success: false,
+          message: `رقم الوصل يجب أن يكون بين ${receiptBook.startNumber} و ${receiptBook.endNumber}`
+        });
+      }
+
+      // التحقق من عدم استخدام رقم الوصل مسبقاً
+      const existingRequest = await PharmacyRequestForm.findOne({
+        receiptNumber: receiptNumber,
+        receiptBookId: receiptBook._id
+      });
+
+      if (existingRequest) {
+        return res.status(400).json({
+          success: false,
+          message: 'رقم الوصل مستخدم مسبقاً'
+        });
+      }
+
+      // التحقق من التسلسل
+      const validation = await receiptBook.validateReceiptNumber(receiptNumber);
+      if (!validation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: validation.message
+        });
+      }
+
+      receiptBookId = receiptBook._id;
     }
 
     // إعداد بيانات الطلب
@@ -71,6 +123,12 @@ export const createPharmacyRequestForm = async (req, res) => {
       adminId: req.user.adminId || req.user._id || req.user.id,
       additionalNotes
     };
+
+    // إضافة رقم الوصل ودفتر الوصلات إذا تم إدخال رقم الوصل
+    if (receiptNumber && receiptBookId) {
+      requestData.receiptNumber = receiptNumber;
+      requestData.receiptBookId = receiptBookId;
+    }
 
     // إضافة تفاصيل الزيارة التعريفية إذا كانت موجودة
     if (introductoryVisit && visitDetails) {
@@ -117,7 +175,8 @@ export const createPharmacyRequestForm = async (req, res) => {
       .populate('pharmacy', 'name address phone')
       .populate('orderDetails.product', 'name price unit')
       .populate('createdBy', 'username')
-      .populate('adminId', 'name email');
+      .populate('adminId', 'name email')
+      .populate('receiptBookId', 'bookName startNumber endNumber');
 
     res.status(201).json({
       success: true,

@@ -20,6 +20,7 @@ import financialPharmacyFormRoutes from "./routes/financialPharmacyForm.routes.j
 import areaAnalyticsRoutes from "./routes/areaAnalytics.routes.js";
 import orderCollectorRoutes from "./routes/orderCollector.routes.js";
 import automationRoutes from "./routes/automation.routes.js";
+import receiptBook from "./routes/receiptBook.routes.js";
 import cors from "cors";
 
 
@@ -66,6 +67,7 @@ app.use("/api/financial-pharmacy", financialPharmacyFormRoutes);
 app.use("/api/area-analytics", areaAnalyticsRoutes);
 app.use("/api/order-collector", orderCollectorRoutes);
 app.use("/api/automation", automationRoutes);
+app.use("/api/receipt-books", receiptBook);
 
 const PORT = process.env.PORT || 4000;
 

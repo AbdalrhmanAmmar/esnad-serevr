@@ -145,8 +145,23 @@ const pharmacyRequestFormSchema = new mongoose.Schema({
     required: [true, 'معرف الأدمن مطلوب']
   },
 
-  // حالة الطلب
+  // رقم الوصل
+  receiptNumber: {
+    type: Number
+  },
 
+  // دفتر الوصلات
+  receiptBookId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ReceiptBook'
+  },
+
+  // حالة التسلسل
+  sequenceStatus: {
+    type: String,
+    enum: ['correct', 'incorrect', 'corrected'],
+    default: 'correct'
+  },
 
   // ملاحظات إضافية
   additionalNotes: {
@@ -180,7 +195,7 @@ pharmacyRequestFormSchema.virtual('totalOrderValue').get(function() {
 });
 
 // Middleware للتحقق من صحة البيانات قبل الحفظ
-pharmacyRequestFormSchema.pre('save', function(next) {
+pharmacyRequestFormSchema.pre('save', async function(next) {
   // التحقق من أن تفاصيل الزيارة التعريفية موجودة إذا كانت الزيارة تعريفية
   if (this.introductoryVisit) {
     if (!this.visitDetails.notes || !this.visitDetails.visitImage) {
@@ -199,6 +214,30 @@ pharmacyRequestFormSchema.pre('save', function(next) {
   if (this.hasCollection) {
     if (!this.collectionDetails.amount || !this.collectionDetails.receiptNumber || !this.collectionDetails.receiptImage) {
       return next(new Error('تفاصيل التحصيل مطلوبة عند وجود تحصيل'));
+    }
+  }
+
+  // التحقق من تسلسل أرقام الوصلات
+  if (this.receiptNumber && this.receiptBookId) {
+    try {
+      const ReceiptBook = mongoose.model('ReceiptBook');
+      const receiptBook = await ReceiptBook.findById(this.receiptBookId);
+      
+      if (receiptBook) {
+        // استخدام رقم الوصل في الدفتر
+        await receiptBook.useReceiptNumber(this.receiptNumber, this._id);
+        
+        // تحديد حالة التسلسل
+        const validation = await receiptBook.validateReceiptNumber(this.receiptNumber);
+        this.sequenceStatus = validation.isSequential ? 'correct' : 'incorrect';
+        
+        // إذا كان الرقم يصحح تسلسل سابق
+        if (!validation.isSequential && validation.canCorrect) {
+          this.sequenceStatus = 'corrected';
+        }
+      }
+    } catch (error) {
+      console.log('Error in receipt book processing:', error);
     }
   }
 

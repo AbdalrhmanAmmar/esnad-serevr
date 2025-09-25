@@ -803,3 +803,219 @@ export const exportMarketingActivitRequests = async (req, res) => {
         });
     }
 };
+
+// الحصول على طلبات الأنشطة التسويقية حسب معرف المستخدم
+export const getMarketingActivitRequestsByUserId = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { 
+            page = 1, 
+            limit = 10, 
+            status, 
+            activityType, 
+            doctor,
+            startDate,
+            endDate,
+            search 
+        } = req.query;
+        
+        const skip = (page - 1) * limit;
+
+        // التحقق من صحة معرف المستخدم
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'معرف المستخدم مطلوب'
+            });
+        }
+
+        // التحقق من وجود المستخدم
+        const user = await User.findById(userId).select('firstName lastName username role supervisor adminId');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'المستخدم غير موجود'
+            });
+        }
+
+        // بناء الفلتر الأساسي حسب المستخدم
+        let filter = {};
+        
+        // تحديد الفلتر بناءً على دور المستخدم
+        if (user.role === 'MEDICAL_REP' || user.role === 'MEDICAL REP') {
+            // إذا كان المستخدم مندوب طبي، نجلب طلباته فقط
+            filter.createdBy = userId;
+            filter.adminId = user.adminId;
+        } else if (user.role === 'ADMIN') {
+            // إذا كان المستخدم أدمن، نجلب طلبات الـ adminId الخاص به
+            filter.adminId = userId;
+        } else if (user.role === 'SUPERVISOR') {
+            // إذا كان المستخدم مشرف، نجلب طلبات المندوبين التابعين له
+            const medicalReps = await User.find({ 
+                supervisor: userId, 
+                role: { $in: ['MEDICAL_REP', 'MEDICAL REP'] }
+            }).select('_id adminId');
+            
+            const medicalRepIds = medicalReps.map(rep => rep._id);
+            const adminIds = [...new Set(medicalReps.map(rep => rep.adminId))];
+            
+            filter.createdBy = { $in: medicalRepIds };
+            filter.adminId = { $in: adminIds };
+        } else {
+            // لأي دور آخر، نرجع رسالة خطأ
+            return res.status(403).json({
+                success: false,
+                message: 'الدور غير مدعوم لهذه العملية'
+            });
+        }
+        
+        // فلترة حسب الحالة
+        if (status && status !== 'all') {
+            filter.status = status;
+        }
+        
+        // فلترة حسب نوع النشاط
+        if (activityType) {
+            filter.activityType = activityType;
+        }
+        
+        // فلترة حسب الدكتور
+        if (doctor) {
+            filter.doctor = doctor;
+        }
+        
+        // فلترة حسب التاريخ
+        if (startDate || endDate) {
+            filter.requestDate = {};
+            if (startDate) {
+                filter.requestDate.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                filter.requestDate.$lte = new Date(endDate);
+            }
+        }
+
+        // البحث النصي
+        if (search) {
+            filter.$or = [
+                { notes: { $regex: search, $options: 'i' } },
+                { 'activityType.name': { $regex: search, $options: 'i' } },
+                { 'activityType.nameAr': { $regex: search, $options: 'i' } },
+                { 'doctor.drName': { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const requests = await MarketingActivitRequest.find(filter)
+            .populate([
+                { 
+                    path: 'activityType', 
+                    select: 'name nameAr description descriptionAr',
+                    match: activityType ? { _id: activityType } : {} 
+                },
+                { 
+                    path: 'doctor', 
+                    select: 'drName specialty organizationName telNumber city area district',
+                    match: doctor ? { _id: doctor } : {} 
+                },
+                { 
+                    path: 'createdBy', 
+                    select: 'firstName lastName username email role' 
+                },
+                { 
+                    path: 'adminId', 
+                    select: 'firstName lastName email' 
+                }
+            ])
+            .sort({ requestDate: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        // إزالة الطلبات التي لا تحتوي على نشاط أو دكتور (في حالة الفلترة)
+        const filteredRequests = requests.filter(request => 
+            request.activityType && request.doctor
+        );
+
+        const total = await MarketingActivitRequest.countDocuments(filter);
+        const totalPages = Math.ceil(total / limit);
+
+        // إحصائيات سريعة
+        const stats = await MarketingActivitRequest.aggregate([
+            { $match: filter },
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 },
+                    totalCost: { $sum: '$cost' }
+                }
+            }
+        ]);
+
+        const statusStats = {
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+            total: total,
+            totalCost: 0
+        };
+        
+        stats.forEach(stat => {
+            statusStats[stat._id] = stat.count;
+            statusStats.totalCost += stat.totalCost || 0;
+        });
+
+        // إحصائيات إضافية حسب الدور
+        let additionalStats = {};
+        
+        if (user.role === 'SUPERVISOR') {
+            const medicalRepsCount = await User.countDocuments({ 
+                supervisor: userId, 
+                role: { $in: ['MEDICAL_REP', 'MEDICAL REP'] }
+            });
+            additionalStats.medicalRepsCount = medicalRepsCount;
+        }
+
+        // معالجة البيانات لإضافة الرسائل العربية
+        const processedRequests = filteredRequests.map(request => ({
+            ...request.toObject(),
+            statusAr: getStatusInArabic(request.status),
+            formattedRequestDate: new Date(request.requestDate).toLocaleDateString('ar-EG'),
+            formattedActivityDate: new Date(request.activityDate).toLocaleDateString('ar-EG'),
+            activityType: {
+                ...request.activityType.toObject(),
+                displayName: request.activityType.nameAr || request.activityType.name
+            }
+        }));
+
+        res.status(200).json({
+            success: true,
+            message: `تم جلب طلبات الأنشطة التسويقية للمستخدم ${user.username} بنجاح`,
+            userInfo: {
+                id: user._id,
+                name: `${user.firstName} ${user.lastName}`,
+                username: user.username,
+                role: user.role
+            },
+            data: processedRequests,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalRequests: total,
+                hasNext: page < totalPages,
+                hasPrev: page > 1
+            },
+            stats: {
+                ...statusStats,
+                ...additionalStats
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching marketing activity requests by user ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'خطأ في جلب طلبات الأنشطة التسويقية',
+            error: error.message
+        });
+    }
+};
+
+// دالة مساعدة لترجمة الحالة إلى العربية

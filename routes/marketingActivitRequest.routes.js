@@ -11,7 +11,8 @@ import {
     getAllMarketingActivitiesForMedicalRep,
     getSupervisorMarketingActivitRequests,
     updateMarketingActivitRequestStatus,
-    exportMarketingActivitRequests
+    exportMarketingActivitRequests,
+    getMarketingActivitRequestsByUserId
 } from '../controllers/MarketingActivitRequest.controller.js';
 
 const router = Router();
@@ -100,5 +101,12 @@ router.delete('/:id',
   checkRole(['MEDICAL_REP', 'MEDICAL REP', 'USER', 'SALES_REP', 'ADMIN', 'SUPER_ADMIN']), 
   deleteMarketingActivitRequest
 );
+
+router.get('/user/:userId', 
+  isAuthenticated, 
+  checkRole(['MEDICAL_REP', 'MEDICAL REP']), 
+  getMarketingActivitRequestsByUserId // أضف هذا المسار
+);
+
 
 export default router;
