@@ -975,6 +975,268 @@ const exportVisitsToExcel = async (req, res) => {
   }
 };
 
+// دالة لجلب جميع الزيارات للمندوبين التابعين لسوبرفايزر معين
+const getVisitsBySupervisor = async (req, res) => {
+  try {
+    const { supervisorId } = req.params;
+    const {
+      page = 1,
+      limit = 10,
+      startDate,
+      endDate,
+      doctorName,
+      medicalRepName,
+      withSupervisor,
+      sortBy = 'visitDate',
+      sortOrder = 'desc'
+    } = req.query;
+
+    console.log("🔍 Getting visits for supervisor ID:", supervisorId);
+
+    // التحقق من صحة معرف المشرف
+    if (!supervisorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'معرف المشرف مطلوب'
+      });
+    }
+
+    // التحقق من وجود المشرف
+    const supervisor = await UserModel.findById(supervisorId);
+    if (!supervisor) {
+      return res.status(404).json({
+        success: false,
+        message: 'المشرف غير موجود'
+      });
+    }
+
+    // جلب جميع المندوبين التابعين لهذا المشرف
+    const teamMembers = await UserModel.find({
+      supervisor: supervisorId,
+      role: 'MEDICAL REP'
+    }).select('_id firstName lastName username');
+
+    if (teamMembers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'لا يوجد مندوبين تابعين لهذا المشرف',
+        data: {
+          visits: [],
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages: 0,
+            totalVisits: 0,
+            hasNextPage: false,
+            hasPrevPage: false
+          },
+          supervisor: {
+            id: supervisor._id,
+            name: `${supervisor.firstName} ${supervisor.lastName}`,
+            teamSize: 0
+          }
+        }
+      });
+    }
+
+    const teamMemberIds = teamMembers.map(member => member._id);
+
+    // بناء فلتر البحث
+    const matchFilter = {
+      medicalRepId: { $in: teamMemberIds },
+      adminId: supervisor.adminId
+    };
+
+    // فلترة حسب التاريخ
+    if (startDate || endDate) {
+      matchFilter.visitDate = {};
+      if (startDate) {
+        matchFilter.visitDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        matchFilter.visitDate.$lte = new Date(endDate);
+      }
+    }
+
+    // فلترة حسب وجود المشرف في الزيارة
+    if (withSupervisor !== undefined) {
+      matchFilter.withSupervisor = withSupervisor === 'true';
+    }
+
+    // إعداد pipeline للـ aggregation
+    const pipeline = [
+      { $match: matchFilter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'medicalRepId',
+          foreignField: '_id',
+          as: 'medicalRep'
+        }
+      },
+      {
+        $lookup: {
+          from: 'doctors',
+          localField: 'doctorId',
+          foreignField: '_id',
+          as: 'doctor'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'supervisorId',
+          foreignField: '_id',
+          as: 'supervisorInfo'
+        }
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'products.productId',
+          foreignField: '_id',
+          as: 'productDetails'
+        }
+      },
+      {
+        $unwind: { path: '$medicalRep', preserveNullAndEmptyArrays: true }
+      },
+      {
+        $unwind: { path: '$doctor', preserveNullAndEmptyArrays: true }
+      }
+    ];
+
+    // فلترة حسب اسم الطبيب
+    if (doctorName) {
+      pipeline.push({
+        $match: {
+          'doctor.drName': { $regex: doctorName, $options: 'i' }
+        }
+      });
+    }
+
+    // فلترة حسب اسم المندوب
+    if (medicalRepName) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { 'medicalRep.firstName': { $regex: medicalRepName, $options: 'i' } },
+            { 'medicalRep.lastName': { $regex: medicalRepName, $options: 'i' } },
+            { 'medicalRep.username': { $regex: medicalRepName, $options: 'i' } }
+          ]
+        }
+      });
+    }
+
+    // إضافة الترتيب
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    pipeline.push({ $sort: sortOptions });
+
+    // تنفيذ الاستعلام للحصول على العدد الإجمالي
+    const totalCountPipeline = [...pipeline, { $count: 'total' }];
+    const totalCountResult = await VisitDoctorForm.aggregate(totalCountPipeline);
+    const totalVisits = totalCountResult.length > 0 ? totalCountResult[0].total : 0;
+
+    // إضافة pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: parseInt(limit) });
+
+    // تنفيذ الاستعلام الرئيسي
+    const visits = await VisitDoctorForm.aggregate(pipeline);
+
+    // حساب معلومات الصفحات
+    const totalPages = Math.ceil(totalVisits / parseInt(limit));
+    const currentPage = parseInt(page);
+
+    // إعداد الاستجابة
+    const response = {
+      success: true,
+      message: `تم جلب ${visits.length} زيارة من أصل ${totalVisits} زيارة`,
+      data: {
+        visits: visits.map(visit => ({
+          _id: visit._id,
+          visitDate: visit.visitDate,
+          doctor: {
+            _id: visit.doctor?._id,
+            name: visit.doctor?.drName,
+            specialization: visit.doctor?.specialization,
+            phone: visit.doctor?.phone,
+            organizationName: visit.doctor?.organizationName,
+            city: visit.doctor?.city
+          },
+          medicalRep: {
+            _id: visit.medicalRep?._id,
+            name: `${visit.medicalRep?.firstName || ''} ${visit.medicalRep?.lastName || ''}`.trim(),
+            username: visit.medicalRep?.username
+          },
+          products: visit.products?.map(product => {
+            const productDetail = visit.productDetails?.find(p => p._id.toString() === product.productId.toString());
+            return {
+              productId: product.productId,
+              productName: productDetail?.PRODUCT,
+              productCode: productDetail?.CODE,
+              brand: productDetail?.BRAND,
+              messageId: product.messageId,
+              samplesCount: product.samplesCount
+            };
+          }) || [],
+          notes: visit.notes,
+          withSupervisor: visit.withSupervisor,
+          supervisorInfo: visit.supervisorInfo?.[0] ? {
+            _id: visit.supervisorInfo[0]._id,
+            name: `${visit.supervisorInfo[0].firstName || ''} ${visit.supervisorInfo[0].lastName || ''}`.trim(),
+            username: visit.supervisorInfo[0].username
+          } : null,
+          createdAt: visit.createdAt,
+          updatedAt: visit.updatedAt
+        })),
+        pagination: {
+          currentPage,
+          totalPages,
+          totalVisits,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
+          limit: parseInt(limit)
+        },
+        supervisor: {
+          id: supervisor._id,
+          name: `${supervisor.firstName} ${supervisor.lastName}`,
+          username: supervisor.username,
+          teamSize: teamMembers.length,
+          teamMembers: teamMembers.map(member => ({
+            id: member._id,
+            name: `${member.firstName} ${member.lastName}`,
+            username: member.username
+          }))
+        },
+        filters: {
+          startDate,
+          endDate,
+          doctorName,
+          medicalRepName,
+          withSupervisor,
+          sortBy,
+          sortOrder
+        }
+      }
+    };
+
+    console.log(`✅ Successfully retrieved ${visits.length} visits for supervisor: ${supervisor.username}`);
+    return res.status(200).json(response);
+
+  } catch (error) {
+    console.error("❌ Error in getVisitsBySupervisor:", error.message);
+    console.error("Stack trace:", error.stack);
+    
+    return res.status(500).json({
+      success: false,
+      message: 'خطأ في الخادم أثناء جلب زيارات المشرف',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 export {
   createVisit,
   getVisitsByMedicalRep,
@@ -986,5 +1248,6 @@ export {
   getAdminVisitStats,
   getFilterOptions,
   getDetailedVisitsByMedicalRep,
-  exportVisitsToExcel
+  exportVisitsToExcel,
+  getVisitsBySupervisor
 };

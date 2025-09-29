@@ -10,7 +10,8 @@ import {
   getAdminVisitStats,
   getFilterOptions,
   getDetailedVisitsByMedicalRep,
-  exportVisitsToExcel
+  exportVisitsToExcel,
+  getVisitsBySupervisor
 } from '../controllers/Formvisitdoctormedicalrep.controller.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { checkRole } from '../middleware/chekRole.js';
@@ -103,9 +104,16 @@ router.delete('/visits/:visitId',
   deleteVisit
 );
 
-// === روتات إضافية للمشرفين ===
+// === روتات المشرفين ===
 
-// الحصول على زيارات الفريق للمشرف
+// الحصول على جميع زيارات المندوبين التابعين لمشرف معين
+// GET /api/visit-forms/supervisor/:supervisorId/visits
+router.get('/supervisor/:supervisorId/visits', 
+  checkRole(['SUPERVISOR']), 
+  getVisitsBySupervisor
+);
+
+// الحصول على زيارات فريق المشرف (الروت القديم - للتوافق مع النسخة السابقة)
 // GET /api/visit-forms/supervisor/:supervisorId/team-visits
 router.get('/supervisor/:supervisorId/team-visits', 
   checkRole(['supervisor', 'admin']), 
