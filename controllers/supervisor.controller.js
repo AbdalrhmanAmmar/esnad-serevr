@@ -31,14 +31,15 @@ export const getSupervisorTeam = async (req, res) => {
       });
     }
 
-    // جلب جميع المستخدمين المرتبطين بهذا المشرف
+    // جلب المندوبين الطبيين فقط المرتبطين بهذا المشرف
     const teamMembers = await UserModel.find({
-      supervisor: supervisorId
+      supervisor: supervisorId,
+      role: 'MEDICAL REP'
     })
     .select("username firstName lastName role teamProducts teamArea createdAt updatedAt")
     .sort({ createdAt: -1 }); // ترتيب حسب تاريخ الإنشاء (الأحدث أولاً)
 
-    console.log(`👥 Found ${teamMembers.length} team members for supervisor: ${supervisor.username}`);
+    console.log(`👥 Found ${teamMembers.length} medical representatives for supervisor: ${supervisor.username}`);
 
     // إعداد الاستجابة
     const response = {
@@ -66,7 +67,7 @@ export const getSupervisorTeam = async (req, res) => {
           }
         }
       },
-      message: `Successfully retrieved ${teamMembers.length} team members`
+      message: `Successfully retrieved ${teamMembers.length} medical representatives`
     };
 
     return res.status(200).json(response);
