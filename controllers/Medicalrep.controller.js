@@ -41,11 +41,19 @@ const getMedicalRepData = async (req, res) => {
       userTeamProductsList.length === 0 ||
       userTeamProductsList.some((x) => toUpper(x) === 'TEAM C' || toUpper(x) === 'ALL');
 
-    // بناء استعلام الأطباء — case-insensitive على area
+    // بناء استعلام الأطباء — case-insensitive على area و teamProducts
     const doctorQuery = { adminId };
+    
+    // فلترة بناءً على area
     if (userAreaList.length > 0) {
       const areaRegex = userAreaList.map((v) => new RegExp(`^${escapeRegex(v)}$`, 'i'));
       doctorQuery.area = { $in: areaRegex };
+    }
+    
+    // فلترة بناءً على teamProducts
+    if (!isAllProducts) {
+      const teamRegex = userTeamProductsList.map((v) => new RegExp(`^${escapeRegex(v)}$`, 'i'));
+      doctorQuery.teamProducts = { $in: teamRegex };
     }
 
     // بناء استعلام المنتجات — case-insensitive على teamProducts
