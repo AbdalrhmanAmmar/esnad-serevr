@@ -201,9 +201,22 @@ export const updateUser = async (req, res) => {
     if (role !== undefined) {
       // التحقق من صحة الدور
       const validRoles = [
-  
-       
-       'SUPERVISOR', 'MANAGER', 'ASSITANT', 'SALES REP' , 'GENERAL MANAGER', 'SALES SUPERVISOR', 'FINANCIAL MANAGER' , 'FINANCIAL OFFICER', 'ORDERS OFFICERS'
+        'SYSTEM_ADMIN',
+        'ADMIN',
+        'MEDICAL REP',
+        'SALES REP',
+        'SUPERVISOR',
+        'SALES SUPERVISOR',
+        'MANAGER',
+        'GENERAL MANAGER',
+        'TEAM_LEAD',
+        'ASSITANT',
+        'FINANCE',
+        'FINANCIAL MANAGER',
+        'FINANCIAL OFFICER',
+        'WAREHOUSE',
+        'ORDERS OFFICERS',
+        'CUSTOM_ROLE'
       ];
 
       if (!validRoles.includes(role)) {
@@ -248,7 +261,19 @@ export const updateUser = async (req, res) => {
         const supervisorExists = await UserModel.findOne({
           _id: supervisor,
           adminId: existingUser.adminId,
-          role: { $in: ['SUPERVISOR', 'MANAGER', 'ASSITANT', 'SALES REP' , 'GENERAL MANAGER', 'SALES SUPERVISOR', 'FINANCIAL MANAGER' , 'FINANCIAL OFFICER', 'ORDERS OFFICERS'] }
+          role: { $in: [
+            'SUPERVISOR', 
+            'SALES SUPERVISOR', 
+            'MANAGER', 
+            'GENERAL MANAGER', 
+            'ASSITANT', 
+            'SALES REP', 
+            'FINANCIAL MANAGER', 
+            'FINANCIAL OFFICER', 
+            'ORDERS OFFICERS',
+            'ADMIN',
+            'SYSTEM_ADMIN'
+          ] }
         });
 
         if (!supervisorExists) {
