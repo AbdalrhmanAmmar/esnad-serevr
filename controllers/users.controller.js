@@ -203,14 +203,7 @@ export const updateUser = async (req, res) => {
       const validRoles = [
   
        
-        "MEDICAL REP",
-        "SALES REP",
-        "SUPERVISOR",
-        "MANAGER",
-        "TEAM_LEAD",
-        "FINANCE",
-        "WAREHOUSE",
-        "CUSTOM_ROLE"
+       'SUPERVISOR', 'MANAGER', 'ASSITANT', 'SALES REP' , 'GENERAL MANAGER', 'SALES SUPERVISOR', 'FINANCIAL MANAGER' , 'FINANCIAL OFFICER', 'ORDERS OFFICERS'
       ];
 
       if (!validRoles.includes(role)) {
