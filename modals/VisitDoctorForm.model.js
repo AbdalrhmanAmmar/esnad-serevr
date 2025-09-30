@@ -62,12 +62,7 @@ const VisitDoctorFormSchema = new mongoose.Schema({
     default: false
   },
   
-  // معرف المشرف (إذا كان موجود)
-  supervisorId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false
-  },
+
   
   // حالة الزيارة
   status: {

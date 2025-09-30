@@ -22,6 +22,7 @@ import orderCollectorRoutes from "./routes/orderCollector.routes.js";
 import automationRoutes from "./routes/automation.routes.js";
 import receiptBook from "./routes/receiptBook.routes.js";
 import doctorCardRoutes from "./routes/doctorCard.routes.js";
+import coachRoutes from "./routes/coach.routes.js";
 import cors from "cors";
 
 
@@ -70,6 +71,7 @@ app.use("/api/order-collector", orderCollectorRoutes);
 app.use("/api/automation", automationRoutes);
 app.use("/api/receipt-books", receiptBook);
 app.use("/api/doctor-card", doctorCardRoutes);
+app.use("/api/coach", coachRoutes);
 
 const PORT = process.env.PORT || 4000;
 

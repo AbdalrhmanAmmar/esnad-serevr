@@ -255,7 +255,7 @@ export const updateUser = async (req, res) => {
         const supervisorExists = await UserModel.findOne({
           _id: supervisor,
           adminId: existingUser.adminId,
-          role: { $in: ['SUPERVISOR', 'MANAGER', 'TEAM_LEAD', 'ADMIN'] }
+          role: { $in: ['SUPERVISOR', 'MANAGER', 'ASSITANT', 'SALES REP' , 'GENERAL MANAGER', 'SALES SUPERVISOR', 'FINANCIAL MANAGER' , 'FINANCIAL OFFICER', 'ORDERS OFFICERS'] }
         });
 
         if (!supervisorExists) {
