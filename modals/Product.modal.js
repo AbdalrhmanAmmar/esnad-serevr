@@ -23,27 +23,7 @@ const ProductsSchema = new mongoose.Schema(
     messages: {
       type: [MessageSubSchema],
       default: [],
-      validate: [
-        {
-          validator: function (arr) {
-            return arr.length <= 3; // حد أقصى 3
-          },
-          message: "كل منتج لا يمكن أن يحتوي على أكثر من 3 رسائل",
-        },
-        {
-          // منع تكرار (lang + tag) مثلاً
-          validator: function (arr) {
-            const seen = new Set();
-            for (const m of arr) {
-              const key = `${(m.lang||'ar').toLowerCase()}|${(m.tag||'').toLowerCase()}`;
-              if (seen.has(key)) return false;
-              seen.add(key);
-            }
-            return true;
-          },
-          message: "لا يمكن تكرار نفس (اللغة + الوسم) داخل نفس المنتج",
-        }
-      ],
+
     },
 
     adminId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
