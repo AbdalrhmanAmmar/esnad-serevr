@@ -80,8 +80,7 @@ const createVisit = async (req, res) => {
       doctorId,
       products,
       notes: notes || '',
-      withSupervisor,
-      supervisorId: withSupervisor ? supervisorId : null
+      withSupervisor
     });
 
     const savedVisit = await newVisit.save();
@@ -89,7 +88,6 @@ const createVisit = async (req, res) => {
     // إرجاع البيانات مع populate للمراجع
     const populatedVisit = await VisitDoctorForm.findById(savedVisit._id)
       .populate('medicalRepId', 'firstName lastName username')
-      .populate('supervisorId', 'firstName lastName username')
       .populate('doctorId', 'drName specialization phone organizationName')
       .populate('products.productId', 'CODE PRODUCT BRAND messages');
 
@@ -212,7 +210,6 @@ const getVisitsByMedicalRep = async (req, res) => {
     const [visits, totalCount] = await Promise.all([
       VisitDoctorForm.find(query)
         .populate('medicalRepId', 'firstName lastName username')
-        .populate('supervisorId', 'firstName lastName username')
         .populate('products.productId', 'CODE PRODUCT BRAND messages')
         .populate('doctorId', 'drName specialization phone organizationName')
         .sort({ visitDate: -1 })
@@ -289,7 +286,6 @@ const getAllVisitsByAdmin = async (req, res) => {
     const [visits, totalCount] = await Promise.all([
       VisitDoctorForm.find(query)
         .populate('medicalRepId', 'firstName lastName username teamProducts teamArea')
-        .populate('supervisorId', 'firstName lastName username')
         .populate('products.productId', 'CODE PRODUCT BRAND messages')
         .populate('doctorId', 'drName specialization phone organizationName')
         .sort({ visitDate: -1 })
@@ -330,7 +326,6 @@ const getVisitById = async (req, res) => {
 
     const visit = await VisitDoctorForm.findById(visitId)
       .populate('medicalRepId', 'firstName lastName username teamProducts teamArea')
-      .populate('supervisorId', 'firstName lastName username')
       .populate('products.productId', 'CODE PRODUCT BRAND COMPANY')
       .lean();
 
@@ -417,13 +412,11 @@ const updateVisit = async (req, res) => {
       visitId,
       {
         ...updateData,
-        supervisorId: updateData.withSupervisor ? updateData.supervisorId : null,
         updatedAt: new Date()
       },
       { new: true }
     )
       .populate('medicalRepId', 'firstName lastName username')
-      .populate('supervisorId', 'firstName lastName username')
       .populate('doctorId', 'drName specialization phone organizationName')
       .populate('products.productId', 'CODE PRODUCT BRAND messages');
 
@@ -493,7 +486,6 @@ const getMedicalRepVisitStats = async (req, res) => {
       VisitDoctorForm.distinct('doctorId', query).then(ids => Doctor.distinct('organizationName', { _id: { $in: ids } })),
       VisitDoctorForm.find(query)
         .populate('medicalRepId', 'firstName lastName')
-        .populate('supervisorId', 'firstName lastName')
         .populate('products.productId', 'CODE PRODUCT BRAND messages')
         .populate('doctorId', 'drName specialization phone organizationName')
         .sort({ visitDate: -1 })
@@ -728,7 +720,6 @@ const getDetailedVisitsByMedicalRep = async (req, res) => {
     const [visits, totalCount] = await Promise.all([
       VisitDoctorForm.find(query)
         .populate('medicalRepId', 'firstName lastName username teamProducts teamArea')
-        .populate('supervisorId', 'firstName lastName username')
         .populate({
           path: 'products.productId',
           select: 'CODE PRODUCT BRAND COMPANY'
@@ -879,7 +870,6 @@ const exportVisitsToExcel = async (req, res) => {
     // الحصول على البيانات مع populate
     const visits = await VisitDoctorForm.find(query)
       .populate('medicalRepId', 'firstName lastName username')
-      .populate('supervisorId', 'firstName lastName username')
       .populate('doctorId', 'drName specialization phone organizationName city segment brand')
       .populate('products.productId', 'CODE PRODUCT BRAND messages')
       .sort({ visitDate: -1 })

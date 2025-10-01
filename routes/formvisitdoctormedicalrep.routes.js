@@ -144,7 +144,6 @@ router.get('/supervisor/:supervisorId/team-visits',
       const [visits, totalCount] = await Promise.all([
         VisitDoctorForm.find(query)
           .populate('medicalRepId', 'firstName lastName username')
-          .populate('supervisorId', 'firstName lastName username')
           .sort({ visitDate: -1 })
           .skip(skip)
           .limit(parseInt(limit))
