@@ -569,9 +569,12 @@ export const getSupervisorMarketingActivitRequests = async (req, res) => {
 // تحديث حالة طلب النشاط التسويقي من قبل السوبر فايزر
 export const updateMarketingActivitRequestStatus = async (req, res) => {
     try {
+        console.log('updateMarketingActivitRequestStatus called');
+        console.log('req.params:', req.params);
+        console.log('req.body:', req.body);
+        console.log('req.user:', req.user);
         const { requestId } = req.params;
         const { status } = req.body;
-        const supervisorId = req.user.id;
 
         // التحقق من صحة البيانات المدخلة
         if (!status) {
@@ -592,20 +595,12 @@ export const updateMarketingActivitRequestStatus = async (req, res) => {
 
         // التحقق من وجود الطلب
         const request = await MarketingActivitRequest.findById(requestId)
-            .populate('createdBy', 'firstName lastName supervisor');
+            .populate('createdBy', 'firstName lastName username');
 
         if (!request) {
             return res.status(404).json({
                 success: false,
                 message: 'الطلب غير موجود'
-            });
-        }
-
-        // التحقق من أن السوبر فايزر مخول لتعديل هذا الطلب
-        if (request.createdBy.supervisor.toString() !== supervisorId) {
-            return res.status(403).json({
-                success: false,
-                message: 'غير مخول لتعديل هذا الطلب'
             });
         }
 
