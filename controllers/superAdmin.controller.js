@@ -65,24 +65,31 @@ export const createAdminAccount = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const admin = new UserModel({
+    // إنشاء أدمن مؤقت للحصول على ID
+    const tempAdmin = new UserModel({
       firstName,
       lastName,
       username,
       password: hashedPassword,
-      role: "ADMIN",  // 👈 أدمن فقط
+      role: "ADMIN",
       isActive: true,
+      adminId: new UserModel()._id, // ID مؤقت
     });
 
-    await admin.save();
+    // حفظ الأدمن أولاً
+    const savedAdmin = await tempAdmin.save();
+    
+    // تحديث adminId ليشير لنفسه
+    savedAdmin.adminId = savedAdmin._id;
+    await savedAdmin.save();
 
     return res.status(201).json({
       success: true,
       message: "تم إنشاء حساب الأدمن بنجاح",
       admin: {
-        id: admin._id,
-        username: admin.username,
-        role: admin.role,
+        id: savedAdmin._id,
+        username: savedAdmin.username,
+        role: savedAdmin.role,
       },
     });
   } catch (err) {
