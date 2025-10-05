@@ -32,7 +32,8 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:1573", // فرنـت عندك
   "http://localhost:3000", 
-  "https://frontend-esnad-5vdt.vercel.app"                           // لو بتجرّب Next
+  "https://frontend-esnad-5vdt.vercel.app",
+  "https://app.menareps.com"               // لو بتجرّب Next
 ];
 
 
