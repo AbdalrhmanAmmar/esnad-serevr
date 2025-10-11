@@ -747,7 +747,15 @@ export const getPharmacyRequestStats = async (req, res) => {
 export const getSalesRepFinalOrders = async (req, res) => {
   try {
     const { salesRepId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      pharmacyName, 
+      orderStatus, 
+      FinalOrderStatusValue,
+      area,
+      search 
+    } = req.query;
 
     // التحقق من صحة معرف مندوب المبيعات
     if (!mongoose.Types.ObjectId.isValid(salesRepId)) {
@@ -759,22 +767,104 @@ export const getSalesRepFinalOrders = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // البحث عن الطلبات التي FinalOrderStatus = true للمندوب المحدد
-    const orders = await PharmacyRequestForm.find({
+    // فلتر أساسي للطلبات النهائية للمندوب المحدد
+    const filter = {
       createdBy: salesRepId,
       FinalOrderStatus: true
-    })
-    .populate('pharmacy', 'customerSystemDescription name address area')
-    .populate('orderDetails.product', 'PRODUCT CODE PRICE BRAND')
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(parseInt(limit));
+    };
 
-    // حساب العدد الإجمالي
-    const totalCount = await PharmacyRequestForm.countDocuments({
-      createdBy: salesRepId,
-      FinalOrderStatus: true
-    });
+    // إضافة فلتر حالة الطلب
+    if (orderStatus && orderStatus.trim() !== '') {
+      filter.orderStatus = orderStatus;
+    }
+
+    // إضافة فلتر قيمة الحالة النهائية
+    if (FinalOrderStatusValue && FinalOrderStatusValue.trim() !== '') {
+      filter.FinalOrderStatusValue = FinalOrderStatusValue;
+    }
+
+    // البحث عن الطلبات النهائية مع populate للصيدليات
+    let query = PharmacyRequestForm.find(filter)
+      .populate('pharmacy', 'customerSystemDescription name address area')
+      .populate('orderDetails.product', 'PRODUCT CODE PRICE BRAND');
+
+    // إضافة فلتر اسم الصيدلية
+    if (pharmacyName && pharmacyName.trim() !== '') {
+      query = query.where('pharmacy').populate({
+        path: 'pharmacy',
+        match: {
+          $or: [
+            { customerSystemDescription: { $regex: pharmacyName, $options: 'i' } },
+            { name: { $regex: pharmacyName, $options: 'i' } }
+          ]
+        },
+        select: 'customerSystemDescription name address area'
+      });
+    }
+
+    // إضافة فلتر المنطقة
+    if (area && area.trim() !== '') {
+      query = query.where('pharmacy').populate({
+        path: 'pharmacy',
+        match: {
+          area: { $regex: area, $options: 'i' }
+        },
+        select: 'customerSystemDescription name address area'
+      });
+    }
+
+    // إضافة البحث العام في أسماء الصيدليات والمناطق
+    if (search && search.trim() !== '') {
+      query = query.where({
+        $or: [
+          { 'pharmacy.customerSystemDescription': { $regex: search, $options: 'i' } },
+          { 'pharmacy.name': { $regex: search, $options: 'i' } },
+          { 'pharmacy.area': { $regex: search, $options: 'i' } }
+        ]
+      });
+    }
+
+    const orders = await query
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // حساب العدد الإجمالي مع نفس الفلاتر
+    let countQuery = PharmacyRequestForm.find(filter);
+    
+    // تطبيق نفس فلاتر البحث للعد
+    if (pharmacyName && pharmacyName.trim() !== '') {
+      countQuery = countQuery.where('pharmacy').populate({
+        path: 'pharmacy',
+        match: {
+          $or: [
+            { customerSystemDescription: { $regex: pharmacyName, $options: 'i' } },
+            { name: { $regex: pharmacyName, $options: 'i' } }
+          ]
+        }
+      });
+    }
+
+    if (area && area.trim() !== '') {
+      countQuery = countQuery.where('pharmacy').populate({
+        path: 'pharmacy',
+        match: {
+          area: { $regex: area, $options: 'i' }
+        }
+      });
+    }
+
+    if (search && search.trim() !== '') {
+      countQuery = countQuery.where({
+        $or: [
+          { 'pharmacy.customerSystemDescription': { $regex: search, $options: 'i' } },
+          { 'pharmacy.name': { $regex: search, $options: 'i' } },
+          { 'pharmacy.area': { $regex: search, $options: 'i' } }
+        ]
+      });
+    }
+
+    const totalCount = await countQuery.countDocuments();
 
     // تنسيق البيانات
     const formattedData = orders.map(order => ({
@@ -804,6 +894,13 @@ export const getSalesRepFinalOrders = async (req, res) => {
       success: true,
       message: 'تم جلب بيانات الطلبات النهائية بنجاح',
       data: formattedData,
+      filters: {
+        pharmacyName: pharmacyName || null,
+        orderStatus: orderStatus || null,
+        FinalOrderStatusValue: FinalOrderStatusValue || null,
+        area: area || null,
+        search: search || null
+      },
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(totalCount / parseInt(limit)),

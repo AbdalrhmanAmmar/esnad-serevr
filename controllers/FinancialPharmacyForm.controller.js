@@ -347,7 +347,17 @@ export const getFinancialPharmacyDataWithCollection = async (req, res) => {
 export const getSalesRepProductsData = async (req, res) => {
   try {
     const { adminId } = req.params;
-    const { page = 1, limit = 10, productId, salesRepId, startDate, endDate, orderStatus } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      productId, 
+      salesRepId, 
+      salesRep, 
+      pharmacy, 
+      startDate, 
+      endDate, 
+      orderStatus 
+    } = req.query;
 
     // بناء الفلتر الأساسي
     const filter = {
@@ -377,10 +387,10 @@ export const getSalesRepProductsData = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // جلب البيانات مع populate للمندوب والصيدلية والمنتجات
-    const salesData = await PharmacyRequestForm.find(filter)
+    let query = PharmacyRequestForm.find(filter)
       .populate({
         path: 'createdBy',
-        select: 'firstName lastName '
+        select: 'firstName lastName username'
       })
       .populate({
         path: 'pharmacy',
@@ -400,12 +410,68 @@ export const getSalesRepProductsData = async (req, res) => {
         FinalOrderStatus: 1,
         FinalOrderStatusValue: 1
       })
-      .sort({ visitDate: -1 })
+      .sort({ visitDate: -1 });
+
+    // تطبيق فلتر اسم مندوب المبيعات (username)
+    if (salesRep && salesRep.trim() !== '') {
+      query = query.populate({
+        path: 'createdBy',
+        match: { username: { $regex: salesRep.trim(), $options: 'i' } },
+        select: 'firstName lastName username'
+      });
+    }
+
+    // تطبيق فلتر اسم الصيدلية
+    if (pharmacy && pharmacy.trim() !== '') {
+      query = query.populate({
+        path: 'pharmacy',
+        match: { customerSystemDescription: { $regex: pharmacy.trim(), $options: 'i' } },
+        select: 'customerSystemDescription area city district'
+      });
+    }
+
+    const salesData = await query
       .skip(skip)
       .limit(parseInt(limit));
 
-    // حساب العدد الإجمالي
-    const totalCount = await PharmacyRequestForm.countDocuments(filter);
+    // حساب العدد الإجمالي مع تطبيق الفلاتر
+    let countQuery = PharmacyRequestForm.find(filter);
+    
+    // تطبيق نفس فلاتر populate للعد الصحيح
+    if (salesRep && salesRep.trim() !== '') {
+      countQuery = countQuery.populate({
+        path: 'createdBy',
+        match: { username: { $regex: salesRep.trim(), $options: 'i' } },
+        select: 'username'
+      });
+    }
+    
+    if (pharmacy && pharmacy.trim() !== '') {
+      countQuery = countQuery.populate({
+        path: 'pharmacy',
+        match: { customerSystemDescription: { $regex: pharmacy.trim(), $options: 'i' } },
+        select: 'customerSystemDescription'
+      });
+    }
+
+    const allResults = await countQuery;
+    
+    // فلترة النتائج التي لها populate صحيح
+    const filteredResults = allResults.filter(item => {
+      let isValid = true;
+      
+      if (salesRep && salesRep.trim() !== '') {
+        isValid = isValid && item.createdBy;
+      }
+      
+      if (pharmacy && pharmacy.trim() !== '') {
+        isValid = isValid && item.pharmacy;
+      }
+      
+      return isValid;
+    });
+    
+    const totalCount = filteredResults.length;
 
     // إنشاء فلتر منفصل للإحصائيات (بدون فلترة حسب orderStatus)
     const statsFilter = {
@@ -493,10 +559,25 @@ export const getSalesRepProductsData = async (req, res) => {
     stats.uniqueProductsCount = stats.uniqueProducts.size;
     delete stats.uniqueProducts;
 
+    // فلترة البيانات المعروضة للتأكد من وجود البيانات المطلوبة
+    const filteredSalesData = salesData.filter(item => {
+      let isValid = true;
+      
+      if (salesRep && salesRep.trim() !== '') {
+        isValid = isValid && item.createdBy;
+      }
+      
+      if (pharmacy && pharmacy.trim() !== '') {
+        isValid = isValid && item.pharmacy;
+      }
+      
+      return isValid;
+    });
+
     // تنسيق البيانات للاستجابة - تجميع المنتجات في طلب واحد
     const formattedData = [];
     
-    salesData.forEach(order => {
+    filteredSalesData.forEach(order => {
       if (order.orderDetails && order.orderDetails.length > 0) {
         // فلترة المنتجات حسب productId إذا تم تحديده
         let filteredOrderDetails = order.orderDetails;
@@ -521,7 +602,7 @@ export const getSalesRepProductsData = async (req, res) => {
           orderId: order._id,
           visitDate: order.visitDate,
           createdAt: order.createdAt,
-          salesRepName: order.createdBy
+          salesRep: order.createdBy
             ? `${order.createdBy.firstName || ''} ${order.createdBy.lastName || ''}`.trim() || 'غير محدد'
             : 'غير محدد',
           salesRepEmail: order.createdBy?.email || '',
@@ -557,6 +638,15 @@ export const getSalesRepProductsData = async (req, res) => {
         totalPages: Math.ceil(totalCount / parseInt(limit)),
         totalRecords: totalCount,
         limit: parseInt(limit)
+      },
+      filters: {
+        salesRepId: salesRepId || null,
+        salesRep: salesRep || null,
+        pharmacy: pharmacy || null,
+        productId: productId || null,
+        orderStatus: orderStatus || null,
+        startDate: startDate || null,
+        endDate: endDate || null
       },
       statistics: {
         summary: {
