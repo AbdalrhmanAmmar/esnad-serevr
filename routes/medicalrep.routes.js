@@ -7,6 +7,7 @@ import {
   assignProductsToMedicalRep,
   getMedicalRepStats
 } from '../controllers/Medicalrep.controller.js';
+import { getMedicalSalesData } from '../controllers/MedicalSalesdata.controller.js';
 
 const router = Router();
 
@@ -25,5 +26,9 @@ router.post('/:userId/assign-products', isAuthenticated, checkRole(['ADMIN', 'SU
 // Get medical rep statistics
 // GET /api/medicalrep/:userId/stats
 router.get('/:userId/stats', isAuthenticated, getMedicalRepStats);
+
+// New: Medical rep own doctor visits + sales reps (same area) approved orders
+// GET /api/medicalrep/sales-data/:medicalRepId
+router.get('/sales-data/:medicalRepId', isAuthenticated, getMedicalSalesData);
 
 export default router;
