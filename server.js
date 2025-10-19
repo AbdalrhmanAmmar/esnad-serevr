@@ -23,6 +23,7 @@ import automationRoutes from "./routes/automation.routes.js";
 import receiptBook from "./routes/receiptBook.routes.js";
 import doctorCardRoutes from "./routes/doctorCard.routes.js";
 import coachRoutes from "./routes/coach.routes.js";
+import PharmacyCard from "./routes/PharmacyCard.routes.js";
 import cors from "cors";
 
 
@@ -47,6 +48,14 @@ app.use(cors({
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
   allowedHeaders: ["Content-Type","Authorization"],
 }));
+
+app.disable("etag");
+
+app.use((req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
+
 
 app.use(express.json());
 
@@ -73,6 +82,7 @@ app.use("/api/automation", automationRoutes);
 app.use("/api/receipt-books", receiptBook);
 app.use("/api/doctor-card", doctorCardRoutes);
 app.use("/api/coach", coachRoutes);
+app.use("/api/pharmacyCard", PharmacyCard);
 
 const PORT = process.env.PORT || 4000;
 
