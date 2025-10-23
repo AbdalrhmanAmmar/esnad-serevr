@@ -22,7 +22,7 @@ import orderCollectorRoutes from "./routes/orderCollector.routes.js";
 import automationRoutes from "./routes/automation.routes.js";
 import receiptBook from "./routes/receiptBook.routes.js";
 import doctorCardRoutes from "./routes/doctorCard.routes.js";
-import coachRoutes from "./routes/coach.routes.js";
+import coachRoutes from "./routes/Coaching.routes.js";
 import PharmacyCard from "./routes/PharmacyCard.routes.js";
 import cors from "cors";
 

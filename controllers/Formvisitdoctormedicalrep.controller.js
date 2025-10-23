@@ -15,7 +15,6 @@ const createVisit = async (req, res) => {
       products,
       notes,
       withSupervisor,
-      supervisorId
     } = req.body;
 
     // التحقق من وجود المندوب الطبي
@@ -61,16 +60,6 @@ const createVisit = async (req, res) => {
       });
     }
 
-    // التحقق من وجود المشرف إذا تم تحديده
-    if (withSupervisor && supervisorId) {
-      const supervisor = await UserModel.findById(supervisorId);
-      if (!supervisor) {
-        return res.status(404).json({
-          success: false,
-          message: 'المشرف غير موجود'
-        });
-      }
-    }
 
     // إنشاء الزيارة الجديدة
     const newVisit = new VisitDoctorForm({
