@@ -47,56 +47,109 @@ const CoachingSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 CoachingSchema.pre('findOneAndUpdate', function (next) {
-  const update = this.getUpdate();
+  let update = this.getUpdate() || {};
 
-  if (!update) return next();
+  const hasSet = update.$set && typeof update.$set === 'object';
+  const src = hasSet ? update.$set : update;
 
-  // نضمن إن الأرقام كلها أرقام حقيقية مش undefined
-  const get = (val) => (typeof val === 'number' ? val : 0);
+  // حوّل أي قيمة رقمية أو نص رقمي إلى Number
+  const toNum = (val) => {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : 0;
+  };
 
   const TotalPlanning =
-    get(update.previousCalls) +
-    get(update.callOrganization) +
-    get(update.TargetingCustomer);
+    toNum(src.previousCalls) +
+    toNum(src.callOrganization) +
+    toNum(src.TargetingCustomer);
 
   const TotalPersonalSkills =
-    get(update.Appearance) +
-    get(update.Confidence) +
-    get(update.AdherenceToReporting) +
-    get(update.TotalVisits);
+    toNum(src.Appearance) +
+    toNum(src.Confidence) +
+    toNum(src.AdherenceToReporting) +
+    toNum(src.TotalVisits);
 
   const TotalKnowledge =
-    get(update.CustomerDistribution) +
-    get(update.ProductKnowledge);
+    toNum(src.CustomerDistribution) +
+    toNum(src.ProductKnowledge);
 
   const TotalSellingSkills =
-    get(update.ClearAndDirect) +
-    get(update.ProductRelated) +
-    get(update.CustomerAcceptance) +
-    get(update.InquiryApproach) +
-    get(update.ListeningSkills) +
-    get(update.SupportingCustomer) +
-    get(update.UsingPresentationTools) +
-    get(update.SolicitationAtClosing) +
-    get(update.GettingPositiveFeedback) +
-    get(update.HandlingObjections);
+    toNum(src.ClearAndDirect) +
+    toNum(src.ProductRelated) +
+    toNum(src.CustomerAcceptance) +
+    toNum(src.InquiryApproach) +
+    toNum(src.ListeningSkills) +
+    toNum(src.SupportingCustomer) +
+    toNum(src.UsingPresentationTools) +
+    toNum(src.SolicitationAtClosing) +
+    toNum(src.GettingPositiveFeedback) +
+    toNum(src.HandlingObjections);
 
   const TotalScore =
     TotalPlanning + TotalPersonalSkills + TotalKnowledge + TotalSellingSkills;
 
-  // تحديث القيم الجديدة في الكويري
-  this.setUpdate({
-    ...update,
-    TotalPlanning,
-    TotalPersonalSkills,
-    TotalKnowledge,
-    TotalSellingSkills,
-    TotalScore,
-  });
+  if (hasSet) {
+    update.$set = {
+      ...update.$set,
+      TotalPlanning,
+      TotalPersonalSkills,
+      TotalKnowledge,
+      TotalSellingSkills,
+      TotalScore,
+    };
+  } else {
+    update = {
+      ...update,
+      TotalPlanning,
+      TotalPersonalSkills,
+      TotalKnowledge,
+      TotalSellingSkills,
+      TotalScore,
+    };
+  }
 
+  this.setUpdate(update);
   next();
 });
 
+// احسب الإجماليات أيضًا عند الحفظ (إنشاء/تعديل عبر save)
+CoachingSchema.pre('save', function (next) {
+  const toNum = (val) => {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  this.TotalPlanning =
+    toNum(this.previousCalls) +
+    toNum(this.callOrganization) +
+    toNum(this.TargetingCustomer);
+
+  this.TotalPersonalSkills =
+    toNum(this.Appearance) +
+    toNum(this.Confidence) +
+    toNum(this.AdherenceToReporting) +
+    toNum(this.TotalVisits);
+
+  this.TotalKnowledge =
+    toNum(this.CustomerDistribution) +
+    toNum(this.ProductKnowledge);
+
+  this.TotalSellingSkills =
+    toNum(this.ClearAndDirect) +
+    toNum(this.ProductRelated) +
+    toNum(this.CustomerAcceptance) +
+    toNum(this.InquiryApproach) +
+    toNum(this.ListeningSkills) +
+    toNum(this.SupportingCustomer) +
+    toNum(this.UsingPresentationTools) +
+    toNum(this.SolicitationAtClosing) +
+    toNum(this.GettingPositiveFeedback) +
+    toNum(this.HandlingObjections);
+
+  this.TotalScore = this.TotalPlanning + this.TotalPersonalSkills + this.TotalKnowledge + this.TotalSellingSkills;
+
+  next();
+});
 
 const Coaching = mongoose.model('Coaching', CoachingSchema);
 

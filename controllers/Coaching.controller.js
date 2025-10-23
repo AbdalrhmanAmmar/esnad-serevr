@@ -87,3 +87,76 @@ export const getCoachingBySupervisor = async (req, res) => {
     });
   }
 };
+
+export const updateCoaching = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'معرّف التقييم مفقود' });
+    }
+
+    // جلب الكوتشنج أولاً للتحقق من الحالة والصلاحيات
+    const coaching = await Coaching.findById(id).populate({
+      path: 'VisitDoctorFormId',
+      select: 'adminId supervisorId'
+    });
+
+    if (!coaching) {
+      return res.status(404).json({ success: false, message: 'لم يتم العثور على هذا التقييم' });
+    }
+
+    // منع تعديل التقييم إذا كان مكتمل
+    if (coaching.isCompleted === true) {
+      return res.status(403).json({ success: false, message: 'لا يمكن تعديل تقييم مكتمل (isCompleted=true)' });
+    }
+
+    // التحقق من نفس التينانت
+    const tenantMatch = coaching.VisitDoctorFormId?.adminId?.toString() === req.user?.adminId?.toString();
+    if (!tenantMatch) {
+      return res.status(403).json({ success: false, message: 'غير مصرح لك بتعديل هذا التقييم (Tenant mismatch)' });
+    }
+
+    // السماح للمشرف صاحب الزيارة أو الأدمن فقط
+    const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SYSTEM_ADMIN';
+    const isOwnerSupervisor = coaching.VisitDoctorFormId?.supervisorId?.toString() === req.user?._id?.toString();
+    if (!isAdmin && !isOwnerSupervisor) {
+      return res.status(403).json({ success: false, message: 'غير مصرح لك بتعديل هذا التقييم' });
+    }
+
+    // بناء الحقول المسموح بتعديلها فقط
+    const allowedFields = [
+      'title', 'Recommendations', 'note',
+      // التخطيط
+      'previousCalls', 'callOrganization', 'TargetingCustomer',
+      // المهارات الشخصية
+      'Appearance', 'Confidence', 'AdherenceToReporting', 'TotalVisits',
+      // المعرفة
+      'CustomerDistribution', 'ProductKnowledge',
+      // مهارات البيع
+      'ClearAndDirect', 'ProductRelated', 'CustomerAcceptance', 'InquiryApproach', 'ListeningSkills',
+      'SupportingCustomer', 'UsingPresentationTools', 'SolicitationAtClosing', 'GettingPositiveFeedback', 'HandlingObjections',
+      // يمكن تغيير حالة الاكتمال إلى true لقفل التقييم لاحقًا
+      'isCompleted'
+    ];
+
+    const updates = {};
+    for (const key of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        updates[key] = req.body[key];
+      }
+    }
+
+    // تنفيذ التحديث - سيُعاد حساب الإجماليات تلقائيًا عبر pre('findOneAndUpdate')
+    const updated = await Coaching.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).lean();
+
+    return res.status(200).json({ success: true, message: 'تم تعديل التقييم بنجاح', data: updated });
+  } catch (err) {
+    console.error('Error in updateCoaching:', err);
+    return res.status(500).json({ success: false, message: 'خطأ في الخادم', error: process.env.NODE_ENV === 'development' ? err.message : undefined });
+  }
+};
