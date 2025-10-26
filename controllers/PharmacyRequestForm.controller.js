@@ -21,6 +21,7 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
+  // Accept all image types
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
@@ -32,7 +33,7 @@ export const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: 10 * 1024 * 1024 // Increased to 10MB
   }
 });
 
@@ -211,7 +212,6 @@ export const getAllSalesRepFinalOrders = async (req, res) => {
 
     // فلتر أساسي للطلبات النهائية فقط
     const filter = {
-      FinalOrderStatus: true
     };
 
     // إضافة فلتر حالة الطلب

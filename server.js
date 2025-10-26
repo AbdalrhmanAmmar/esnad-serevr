@@ -31,22 +31,20 @@ const app = express();
 
 
 const allowedOrigins = [
-  "http://localhost:1573", // فرنـت عندك
-  "http://localhost:3000", 
-  "https://frontend-esnad-5vdt.vercel.app",
-  "https://app.menareps.com"               // لو بتجرّب Next
+  "http://localhost:3000",                   // تطوير محلي
+  "https://frontend-esnad-5vdt.vercel.app", // فرونت على Vercel
+  "https://app.menareps.com",               // دومين مستقبلي
 ];
 
-
 app.use(cors({
-  origin: (origin, cb) => {
-    // السماح لأدوات مثل Postman (origin = undefined)
-    if (!origin) return cb(null, true);
-    return allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error("Not allowed by CORS"));
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // Postman أو أدوات بدون origin
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
   },
-  credentials: true,            // لو هتستخدم كوكيز/جلسات
-  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.disable("etag");
@@ -87,5 +85,7 @@ app.use("/api/pharmacyCard", PharmacyCard);
 const PORT = process.env.PORT || 4000;
 
 connection().then(() => {
-  app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+  app.listen(PORT, '0.0.0.0', () => 
+    console.log(`🚀 Server running at ${PORT}`)
+  );
 });

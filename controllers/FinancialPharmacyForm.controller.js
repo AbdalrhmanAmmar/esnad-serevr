@@ -17,7 +17,6 @@ const filter = {
 
 adminId,
 
-hasCollection: true // فقط الطلبات التي تحتوي على تحصيل
 
 };
 
