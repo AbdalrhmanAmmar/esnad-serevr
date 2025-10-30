@@ -770,7 +770,7 @@ export const getSalesRepFinalOrders = async (req, res) => {
     // فلتر أساسي للطلبات النهائية للمندوب المحدد
     const filter = {
       createdBy: salesRepId,
-      FinalOrderStatus: true
+   
     };
 
     // إضافة فلتر حالة الطلب

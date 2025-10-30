@@ -160,3 +160,17 @@ export const updateCoaching = async (req, res) => {
     return res.status(500).json({ success: false, message: 'خطأ في الخادم', error: process.env.NODE_ENV === 'development' ? err.message : undefined });
   }
 };
+
+export const getCoachingById = async (req, res) => {
+  try{
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'معرّف التقييم مفقود' });
+    }
+    const coaching = await Coaching.findById(id)
+    res.status(200).json({ success: true, data: coaching });
+  }catch(err){
+    console.error('Error in getCoachingById:', err);
+    return res.status(500).json({ success: false, message: 'خطأ في الخادم', error: process.env.NODE_ENV === 'development' ? err.message : undefined });
+  }
+}

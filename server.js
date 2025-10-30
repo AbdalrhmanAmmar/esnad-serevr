@@ -24,6 +24,10 @@ import receiptBook from "./routes/receiptBook.routes.js";
 import doctorCardRoutes from "./routes/doctorCard.routes.js";
 import coachRoutes from "./routes/Coaching.routes.js";
 import PharmacyCard from "./routes/PharmacyCard.routes.js";
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+
 import cors from "cors";
 
 
@@ -33,7 +37,8 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",                   // تطوير محلي
   "https://frontend-esnad-5vdt.vercel.app", // فرونت على Vercel
-  "https://app.menareps.com",               // دومين مستقبلي
+  "https://app.menareps.com", 
+  "http://localhost:1573",              // دومين مستقبلي
 ];
 
 app.use(cors({
@@ -53,6 +58,12 @@ app.use((req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+
 
 
 app.use(express.json());
@@ -85,7 +96,7 @@ app.use("/api/pharmacyCard", PharmacyCard);
 const PORT = process.env.PORT || 4000;
 
 connection().then(() => {
-  app.listen(PORT, '0.0.0.0', () => 
+  app.listen(PORT, () => 
     console.log(`🚀 Server running at ${PORT}`)
   );
 });
